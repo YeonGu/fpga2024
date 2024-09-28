@@ -3,6 +3,7 @@ test_run_dir/*
 .metals/**
 *.json
 .vscode/*
+.bloop/*
 
 project/**
 project/**.**
