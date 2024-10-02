@@ -5,11 +5,15 @@ import chisel3.util.log2Up
 import __global__.Params._
 import __global__._
 
+/** MIP Core for Maximum/Minimum Intensity Projection.
+  */
+
 class MipInputData extends Bundle {
-    val valid    = Input(Bool())
-    val density  = Input(UInt(DENS_DEPTH.W))
-    val voxelPos = Input(UInt(VOXEL_POS_XLEN.W))
-    val mvpInfo  = Input(new MvpMat())
+    val valid         = Input(Bool())
+    val pipelineStall = Input(Bool())
+    val density       = Input(UInt(DENS_DEPTH.W))
+    val voxelPos      = Input(UInt(VOXEL_POS_XLEN.W))
+    val mvpInfo       = Input(new Mat3x3())
 }
 
 class MipOutputData extends Bundle {
@@ -18,7 +22,8 @@ class MipOutputData extends Bundle {
     val screenPos = Output(new ScreenPos())
 }
 
-/** @in
+/** MIP/MinIP/AIP(?) Core.
+  * @in
   * @out
   */
 class IntensityProjectionCore extends Module {

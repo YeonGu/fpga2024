@@ -1,3 +1,6 @@
 .vscode/*
 .metals/*
 .scala-build/*
+*.bkp
+*.dtmp
+downloads/*

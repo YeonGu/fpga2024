@@ -9,4 +9,8 @@ object Params {
 
     val IMAGE_SIZE     = 1024
     val VOXEL_POS_XLEN = 16
+
+    val MVP_MAT_BITDEPTH = 8
+
+    val MIP_CORES = 16;
 }
