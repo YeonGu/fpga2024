@@ -1,0 +1,76 @@
+{
+  "signal": [
+    {
+      "name": "clk",
+      "wave": "p..............."
+    },
+
+    [
+      "#0",
+      {
+        "name": "wb_group",
+        "wave": "22222",
+        "data": ["0", "?", "?", "0", "?"]
+      },
+      {
+        "name": "wb_ready_#0",
+        "wave": "10.10"
+      }
+    ],
+    [
+      "#1",
+      {
+        "name": "wb_group",
+        "wave": "3333.3",
+        "data": ["?", "?", "?", "0", "?"]
+      },
+      {
+        "name": "wb_ready_#1",
+        "wave": "0...10"
+      }
+    ],
+    [
+      "#2",
+      {
+        "name": "wb_group",
+        "wave": "44444",
+        "data": ["?", "0", "?", "?", "?"]
+      },
+      {
+        "name": "wb_ready_#2",
+        "wave": "010.."
+      }
+    ],
+    [
+      "#3",
+      {
+        "name": "wb_group",
+        "wave": "5555....5",
+        "data": ["?", "?", "?", "0", "?"]
+      },
+      {
+        "name": "wb_ready_#3",
+        "wave": "0......10"
+      }
+    ],
+    [
+      "Cache group #0",
+      {
+        "name": "cache0_state",
+        "wave": "6....7.6..",
+        "data": ["idle", "replacing", "idle"]
+      },
+      {
+        "name": "cache0_rden",
+        "wave": "1.01....."
+      },
+      {
+        "name": "cache0_priority",
+        "wave": "88x888..."
+      }
+    ]
+  ],
+  "config": {
+    "hscale": 1
+  }
+}

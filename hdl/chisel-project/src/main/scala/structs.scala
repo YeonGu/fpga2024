@@ -24,33 +24,48 @@ import chisel3._
 import chisel3.util._
 
 /** AXI4 interface definition using Decoupled */
-class AXI4Interface(addrWidth: Int, dataWidth: Int) extends Bundle {
+class AXI4InterfaceM(addrWidth: Int, dataWidth: Int) extends Bundle {
     // Write address channel
-    val writeAddr = Decoupled(new Bundle {
-        val addr = UInt(addrWidth.W)
-        val prot = UInt(3.W)
-    })
+    val awaddr  = Output(UInt(addrWidth.W))
+    val awprot  = Output(UInt(3.W))
+    val awvalid = Output(Bool())
+    val awready = Input(Bool())
 
     // Write data channel
-    val writeData = Decoupled(new Bundle {
-        val data = UInt(dataWidth.W)
-        val strb = UInt((dataWidth / 8).W)
-    })
+    val wdata  = Output(UInt(dataWidth.W))
+    val wstrb  = Output(UInt((dataWidth / 8).W))
+    val wvalid = Output(Bool())
+    val wready = Input(Bool())
 
     // Write response channel
-    val writeResp = Flipped(Decoupled(new Bundle {
-        val resp = UInt(2.W)
-    }))
+    val bresp  = Input(UInt(2.W))
+    val bvalid = Input(Bool())
+    val bready = Output(Bool())
 
     // Read address channel
-    val readAddr = Decoupled(new Bundle {
-        val addr = UInt(addrWidth.W)
-        val prot = UInt(3.W)
-    })
+    val araddr  = Output(UInt(addrWidth.W))
+    val arprot  = Output(UInt(3.W))
+    val arvalid = Output(Bool())
+    val arready = Input(Bool())
 
     // Read data channel
-    val readData = Flipped(Decoupled(new Bundle {
-        val data = UInt(dataWidth.W)
-        val resp = UInt(2.W)
-    }))
+    val rdata  = Input(UInt(dataWidth.W))
+    val rresp  = Input(UInt(2.W))
+    val rvalid = Input(Bool())
+    val rready = Output(Bool())
+}
+
+/* Xilinx FIFO IP IO wrapping. From the perspective of FIFO IP. */
+/* TODO: Check the ports. */
+class XilinxFIFOIO(dataWidth: Int, depth: Int) extends Bundle {
+    val din          = Input(UInt(dataWidth.W))
+    val wr_en        = Input(Bool())
+    val rd_en        = Input(Bool())
+    val dout         = Output(UInt(dataWidth.W))
+    val full         = Output(Bool())
+    val empty        = Output(Bool())
+    val almost_full  = Output(Bool())
+    val almost_empty = Output(Bool())
+    val wr_count     = Output(UInt(log2Up(depth + 1).W))
+    val rd_count     = Output(UInt(log2Up(depth + 1).W))
 }

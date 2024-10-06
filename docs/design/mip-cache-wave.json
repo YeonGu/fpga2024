@@ -1,0 +1,65 @@
+{
+  "signal": [
+    {
+      "name": "clk",
+      "wave": "p..............."
+    },
+    {
+      "name": "MIP Cache FIFO read data",
+      "wave": "345678........93",
+      "data": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    },
+    {
+      "name": ""
+    },
+
+    {
+      "name": "delayed mip data (in cache port)",
+      "wave": "xx3456........78",
+      "data": ["1", "2", "3", "4", "5", "6", "7", "8"]
+    },
+    {
+      "name": "in Cache? (delay 2) / data valid",
+      "wave": "xx1..0.......1.."
+    },
+    {
+      "name": "new cache request / pipeline stall",
+      "wave": "x.0..1.......0.."
+    },
+
+    [
+      "AXI",
+      {
+        "name": "r/ravalid",
+        "wave": "x.0..1..0.......",
+        "data": ["A", "B", "C", "D", "E", "F"]
+      },
+      {
+        "name": "rdvalid",
+        "wave": "xx0.........10.."
+      }
+    ],
+
+    {
+      "name": ""
+    },
+
+    [
+      "WB Channel Pipeline",
+      {
+        "name": "read command",
+        "wave": "3456........93",
+        "data": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+      },
+      { "name": "hit/group/tags/rden", "wave": "1..0.......1.." },
+      { "name": "decode info / BRAM cmd ", "wave": "x3456........9" },
+      { "name": "BRAM read data (outreg)", "wave": "xxx3456........9" },
+      { "name": "BRAM read valid", "wave": "xxx1..0.......1." },
+      { "name": "Compare", "wave": "xxx1010.......10" },
+      {
+        "name": "wben & wbaddr & data",
+        "wave": "xxxx3x5xxxxxxxx6xxxxxx7xxxxxx8xxxxxx9"
+      }
+    ]
+  ]
+}
