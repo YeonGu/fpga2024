@@ -29,4 +29,15 @@ class MipOutputData extends Bundle {
 class IntensityProjectionCore extends Module {
     val in  = IO(new MipInputData())
     val out = IO(new MipOutputData())
+
+    val mip = Module(new mip())
+    mip.io.in <> in
+    out <> mip.io.out
+}
+
+class mip extends BlackBox {
+    val io = IO(new Bundle {
+        val in  = (new MipInputData())
+        val out = new MipOutputData()
+    })
 }

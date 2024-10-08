@@ -111,6 +111,40 @@ class CacheGroup(GROUP_INDEX: UInt) extends Module {
     }
     val cacheReqStatus = RegInit(CacheReqStatus.idle)
 
+    val missSelChannel = PriorityEncoder(misses)
+    val miss           = misses.reduce(_ || _)
+
+    switch(cacheReqStatus) {
+        is(CacheReqStatus.idle) { when(miss) { cacheReqStatus := CacheReqStatus.waiting } }
+        is(CacheReqStatus.waiting) {
+            when(io.cacheReq.ready) {
+                cacheReqStatus := CacheReqStatus.replacing
+            }
+        }
+        is(CacheReqStatus.replacing) {
+            when(cacheReadCount === (MIP_CACHE_BLOCK_SIZE - 1).U) {
+                cacheReqStatus := CacheReqStatus.idle
+            }
+        }
+    }
+
+    /* Cache Request processing */
+    val reqAddr        = RegInit(0.U(SCREEN_ADDR_WIDTH.W))
+    val cacheReadCount = RegInit(0.U(log2Ceil(MIP_CACHE_BLOCK_SIZE).W))
+
+    io.cacheReq.screenAddr := reqAddr
+    io.cacheReq.valid      := cacheReqStatus === CacheReqStatus.waiting
+
+    when(cacheReqStatus === CacheReqStatus.idle && miss) {
+        reqAddr := io.cacheReq.screenAddr
+    }.otherwise { reqAddr := reqAddr }
+
+    cacheReadCount := Mux(
+        cacheReqStatus === CacheReqStatus.replacing && io.cacheReq.ready && io.cacheReq.valid,
+        cacheReadCount + 1.U,
+        0.U
+    )
+
 }
 
 class XilinxBramCache extends BlackBox {
@@ -119,7 +153,7 @@ class XilinxBramCache extends BlackBox {
         val rst    = Input(Bool())
         val wrEn   = Input(Bool())
         val wrAddr = Input(UInt(log2Ceil(MIP_CACHE_BLOCK_SIZE).W))
-        val wrData = Input(UInt(32.W))
+        val wrData = Input(UInt(DENS_DEPTH.W))
         val rdEn   = Input(Bool())
         val rdAddr = Output(UInt(log2Ceil(MIP_CACHE_BLOCK_SIZE).W))
         val rdData = Input(UInt(32.W))
