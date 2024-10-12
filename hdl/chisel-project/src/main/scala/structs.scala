@@ -17,7 +17,7 @@ class VoxelVector3 extends Bundle {
 
 /* 3x3 MVP Matrix with elements whose bitdepth is MVP_MAT_BITDEPTH */
 class Mat3x3 extends Bundle {
-    val mat = Vec(3, Vec(3, UInt(MVP_MAT_BITDEPTH.W)))
+    val mat = Vec(3, Vec(3, SInt(MVP_MAT_BITDEPTH.W)))
 }
 
 import chisel3._
