@@ -19,8 +19,8 @@ class RenderCoreInputData extends Bundle {
     val pipelineStall = Input(Bool())
     val density       = Input(Vec(CORENUMS, UInt(DENS_DEPTH.W)))
     val voxelPos      = Input(Vec(CORENUMS, UInt((3 * VOXEL_POS_XLEN).W)))
-    val mvpInfo       = Input(new Mat3x3())
-    val baseCoord     = Input(Vec(3, SInt(BASEPOS_XLEN.W)))
+    val mvpInfo       = Input(new Mat3x4())
+    val baseCoord     = Input(Vec(3, SInt(BASE_POS_XLEN.W)))
 }
 
 class RenderCoreOutputData extends Bundle {
@@ -44,9 +44,11 @@ class RenderCore extends Module {
         cu.io.in.valid         := io.in.valid
         cu.io.in.pipelineStall := io.in.pipelineStall
         cu.io.in.density       := io.in.density(idx)
-        cu.io.in.voxelPos      := io.in.voxelPos(idx)
-        cu.io.in.mvpInfo       := io.in.mvpInfo
-        cu.io.in.baseCoord     := io.in.baseCoord
+        cu.io.in.voxelPos(0)   := io.in.voxelPos(idx)(VOXEL_POS_XLEN - 1, 0)
+        cu.io.in.voxelPos(1)   := io.in.voxelPos(idx)(2 * VOXEL_POS_XLEN - 1, VOXEL_POS_XLEN)
+        cu.io.in.voxelPos(2) := io.in.voxelPos(idx)(3 * VOXEL_POS_XLEN - 1, 2 * VOXEL_POS_XLEN)
+        cu.io.in.mvpInfo     := io.in.mvpInfo
+        cu.io.in.baseCoord   := io.in.baseCoord
     }
 
     // Result registers
@@ -73,5 +75,3 @@ class RenderCore extends Module {
 
     io.out.packedResult := resultRegs
 }
-
-

@@ -13,9 +13,9 @@ class MipInputData extends Bundle {
     val valid         = Input(Bool())
     val pipelineStall = Input(Bool())
     val density       = Input(UInt(DENS_DEPTH.W))
-    val voxelPos      = Input(UInt((3 * VOXEL_POS_XLEN).W))
-    val mvpInfo       = Input(new Mat3x3())
-    val baseCoord     = Input(Vec(3, SInt(BASEPOS_XLEN.W)))
+    val voxelPos      = Input(Vec(3, UInt(VOXEL_POS_XLEN.W)))
+    val mvpInfo       = Input(new Mat3x4())
+    val baseCoord     = Input(Vec(3, SInt(BASE_POS_XLEN.W)))
 }
 
 class MipOutputData extends Bundle {

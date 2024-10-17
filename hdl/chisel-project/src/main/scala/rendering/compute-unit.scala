@@ -9,192 +9,166 @@ import __global__.Params._
 import fixedpoint._
 
 object CUParams {
-    val FRAC_WIDTH         = 6
-    val TOTAL_WIDTH        = 16
-    val INT_WIDTH          = TOTAL_WIDTH - FRAC_WIDTH
-    val VOXEL_OFFSET_WIDTH = 9
-    // val SCREEN_W           = 640 // 假设的屏幕宽度
-    // val SCREEN_H           = 480 // 假设的屏幕高度
-    // val DENS_DEPTH         = 8   // 假设的density位宽
+    val FRAC_WIDTH              = 6
+    val TOTAL_WIDTH             = 16
+    val INT_WIDTH               = TOTAL_WIDTH - FRAC_WIDTH - 1            // 不包括符号位
+    val VOXEL_OFFSET_WIDTH      = 9
+    val FRAC_INTERMEDIATE_WIDTH = 12
+    val INTERMEDIATE_WIDTH      = INT_WIDTH + FRAC_INTERMEDIATE_WIDTH + 1 // 包括符号位
 }
 
 import CUParams._
 
 class StageIO extends Bundle {
-    val inputValid = Bool()
-    val valid      = Bool()
-    val density    = UInt(DENS_DEPTH.W)
-    val data       = Vec(3, SInt(TOTAL_WIDTH.W))
-    val overflow   = Bool()
+    val valid    = Bool()
+    val density  = UInt(DENS_DEPTH.W)
+    val data     = Vec(3, new FloatPoint())
 }
 
-// assuming baseCoord is already fixed point
-class WorldCoordStage(gridResolution: Int, gridSize: Int) extends Module {
+// gridResolution, gridSize是电路常量, 暂时不支持软件更改密度场分辨率和大小
+class WorldCoordStage(val gridResolution: Int, val gridSize: Int) extends Module {
+    val voxel_width = log2Up(gridResolution).toInt
     val io = IO(new Bundle {
-        val in  = Input(new MipInputData())
+        val in  = new MipInputData()
         val out = Output(new StageIO())
     })
 
-    require(log2Up(gridResolution) >= FRAC_WIDTH)
-    val voxel_offset_x =
-        io.in.voxelPos(log2Up(gridResolution) - 1, log2Up(gridResolution) - FRAC_WIDTH)
-    val voxel_offset_y =
-        io.in.voxelPos(log2Up(gridResolution) + 9 - 1, log2Up(gridResolution) + 9 - FRAC_WIDTH)
-    val voxel_offset_z =
-        io.in.voxelPos(log2Up(gridResolution) + 9 + 9 - 1, log2Up(gridResolution) + 9 + 9 - FRAC_WIDTH)
-    val world_offset_x = (voxel_offset_x * gridSize.U).asSInt
-    val world_offset_y = (voxel_offset_y * gridSize.U).asSInt
-    val world_offset_z = (voxel_offset_z * gridSize.U).asSInt
-
-    val world_coord_tmp = Wire(Vec(3, SInt((1 + TOTAL_WIDTH).W)))
-    world_coord_tmp(0) := io.in.baseCoord.asTypeOf(Vec(3, SInt(TOTAL_WIDTH.W)))(
-        0
-    ) +& world_offset_x
-    world_coord_tmp(1) := io.in.baseCoord.asTypeOf(Vec(3, SInt(TOTAL_WIDTH.W)))(
-        1
-    ) +& world_offset_y
-    world_coord_tmp(2) := io.in.baseCoord.asTypeOf(Vec(3, SInt(TOTAL_WIDTH.W)))(
-        2
-    ) +& world_offset_z
-
-    val overflow = world_coord_tmp.map { coord =>
-        coord(TOTAL_WIDTH) =/= coord(TOTAL_WIDTH - 1)
-    }.reduce(_ || _)
-
-    val world_coord = Wire(Vec(3, SInt(TOTAL_WIDTH.W)))
-    world_coord.zipWithIndex.map { case (coord, idx) =>
-        coord := Mux(
-            overflow,
-            Mux(
-                world_coord_tmp(idx)(TOTAL_WIDTH),
-                -(1 << (TOTAL_WIDTH - 1)).S,
-                ((1 << (TOTAL_WIDTH - 1)) - 1).S
-            ),
-            world_coord_tmp(idx)(TOTAL_WIDTH - 1, 0).asSInt
-        )
+    val ratio        = 0x800.S(INTERMEDIATE_WIDTH.W)
+    val voxel_offset = Wire(Vec(3, SInt(INTERMEDIATE_WIDTH.W)))
+    for (i <- 0 until 3) {
+        voxel_offset(i) := Cat(
+            0.U(1.W),
+            io.in.voxelPos(i),
+            0.U(FRAC_INTERMEDIATE_WIDTH.W)
+        ).asSInt
     }
 
-    val outReg = RegInit(0.U.asTypeOf(new StageIO()))
-    outReg.inputValid := io.in.valid && !io.in.pipelineStall
-    outReg.valid      := !overflow
-    outReg.density    := io.in.density
-    outReg.data       := world_coord
-    outReg.overflow   := overflow
+    val world_offset_tmp = Wire(Vec(3, SInt((2 * INTERMEDIATE_WIDTH).W)))
+    for (i <- 0 until 3) {
+        world_offset_tmp(i) := voxel_offset(i) * ratio
+    }
+    val world_offset = Wire(Vec(3, SInt(INTERMEDIATE_WIDTH.W)))
+    for (i <- 0 until 3) {
+        world_offset(i) := world_offset_tmp(i)(
+            FRAC_INTERMEDIATE_WIDTH + INTERMEDIATE_WIDTH - 1,
+            FRAC_INTERMEDIATE_WIDTH
+        ).asSInt
+    }
+    val base_coord = Wire(Vec(3, SInt(INTERMEDIATE_WIDTH.W)))
+    for (i <- 0 until 3) {
+        base_coord(i) := Cat(
+            io.in.baseCoord(i),
+            0.U((INTERMEDIATE_WIDTH - BASE_POS_XLEN).W)
+        ).asSInt
+    }
+    val world_coord_tmp = Wire(Vec(3, SInt((1 + INTERMEDIATE_WIDTH).W)))
+    for (i <- 0 until 3) {
+        world_coord_tmp(i) := world_offset(i) + base_coord(i)
+    }
 
-    io.out := outReg
+    val out_reg = RegInit(0.U.asTypeOf(new StageIO()))
+    out_reg.valid    := io.in.valid && !io.in.pipelineStall
+    out_reg.density  := io.in.density
+    out_reg.data(0)  := Fixed2Float(world_coord_tmp(0)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
+    out_reg.data(1)  := Fixed2Float(world_coord_tmp(1)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
+    out_reg.data(2)  := Fixed2Float(world_coord_tmp(2)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
+
+    io.out := out_reg
 }
 
-class MVPTransformStage(gridResolution: Int, gridSize: Int) extends Module {
+class MVPTransformStage(val gridResolution: Int, val gridSize: Int) extends Module {
     val io = IO(new Bundle {
         val in      = Input(new StageIO())
-        val mvpInfo = Input(new Mat3x3())
+        val mvpInfo = Input(new Mat3x4())
         val out     = Output(new StageIO())
     })
 
-    val transformedCoord = Wire(Vec(3, SInt((2 * TOTAL_WIDTH).W)))
+    val valid = ShiftRegister(io.in.valid, 4)
+    val density = ShiftRegister(io.in.density, 4)
+    val world_coord = Wire(Vec(3, new FloatPoint))
     for (i <- 0 until 3) {
-        transformedCoord(i) := (io.mvpInfo.mat(i)(0) * io.in.data(0) +
-            io.mvpInfo.mat(i)(1) * io.in.data(1) +
-            io.mvpInfo.mat(i)(2) * io.in.data(2)) >> FRAC_WIDTH
+        world_coord(i) := io.in.data(i)
     }
-
-    val outReg = RegInit(0.U.asTypeOf(new StageIO()))
-    outReg.inputValid := io.in.inputValid
-    outReg.valid      := io.in.valid
-    outReg.density    := io.in.density
-    outReg.data       := transformedCoord.map(_.asSInt)
-    outReg.overflow   := io.in.overflow
-
-    io.out := outReg
+   
+    val transfromed_coord = Wire(Vec(3, new FloatPoint()))
+    for (i <- 0 until 3) {
+        val val00 = FloatMul(world_coord(0), io.mvpInfo.mat(i)(0), clock)
+        val val01 = FloatMul(world_coord(1), io.mvpInfo.mat(i)(1), clock)
+        val val02 = FloatMul(world_coord(2), io.mvpInfo.mat(i)(2), clock)
+        val acc01 = FloatAdd(val00, val01, clock)
+        val acc02 = FloatAdd(val02, io.mvpInfo.mat(i)(3), clock)
+        val acc  = FloatAdd(acc01, acc02, clock)
+        transfromed_coord(i) := acc
+    }
+    val out_reg = RegInit(0.U.asTypeOf(new StageIO))
+    out_reg.valid := valid
+    out_reg.density := density
+    out_reg.data(0) := transfromed_coord(0)
+    out_reg.data(1) := transfromed_coord(1)
+    out_reg.data(2) := transfromed_coord(2)
+    io.out := out_reg
 }
 
-class PerspectiveDivisionStage(gridResolution: Int, gridSize: Int) extends Module {
+class PerspectiveDivisionStage(val gridResolution: Int, val gridSize: Int) extends Module {
     val io = IO(new Bundle {
         val in  = Input(new StageIO())
         val out = Output(new MipOutputData())
     })
 
-    val divByZero = io.in.data(2) === 0.S
+    val valid = ShiftRegister(io.in.valid, 12)
+    val density = ShiftRegister(io.in.density, 12)
+    // pre-defined constants
+    val focal = FloatPoint(0.B, "b1111".U, "b100000000".U)
+    val focal_aspect = FloatPoint(0.B, "b1111".U, "b1010101010".U)
 
-    val focal = (0.4 * (1 << FRAC_WIDTH)).toInt.S(TOTAL_WIDTH.W)
-    val aspectRatio =
-        ((SCREEN_H.toFloat / SCREEN_V.toFloat) * (1 << FRAC_WIDTH)).toInt.S(TOTAL_WIDTH.W)
-    val screenCoord = Wire(Vec(2, SInt(TOTAL_WIDTH.W)))
-    def fixedPointDivision(num: SInt, den: SInt): SInt = {
-        val shiftedNum = (num << FRAC_WIDTH).asSInt
-        (shiftedNum / den).asSInt
-    }
+    val world_coord_x = io.in.data(0)
+    val world_coord_y = io.in.data(1)
+    val world_coord_z = io.in.data(2)
+    val half_screen   = (1.S << (FRAC_INTERMEDIATE_WIDTH - 1))
+    val coord_x_focal = FloatMul(world_coord_x, focal, clock)
+    val coord_y_focal = FloatMul(world_coord_y, focal_aspect, clock)
 
-    when(!divByZero) {
-        val xDivZ = fixedPointDivision(io.in.data(0), io.in.data(2))
-        val yDivZ = fixedPointDivision(io.in.data(1), io.in.data(2))
+    val x_div_z = FloatDiv(coord_x_focal, world_coord_z, clock)
+    val y_div_z = FloatDiv(coord_y_focal, world_coord_z, clock)
 
-        val xDivZF = fixedPointDivision(xDivZ, focal)
-        val yDivZF = fixedPointDivision(yDivZ, focal)
+    val x_div_z_plus_1 = FloatAdd(x_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
+    val y_div_z_plus_1 = FloatAdd(y_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
 
-        val yDivZFA = (yDivZF * aspectRatio) >> FRAC_WIDTH
+    val screen_pos_x = FloatMul(x_div_z_plus_1, FloatPoint(0.B, "b11000".U, "b100000000".U), clock)
+    val screen_pos_y = FloatMul(y_div_z_plus_1, FloatPoint(0.B, "b10111".U, "b1110000000".U), clock)
 
-        screenCoord(0) := (xDivZF + (1.S << FRAC_WIDTH)) >> 1
-        screenCoord(1) := ((1.S << FRAC_WIDTH) - (yDivZFA + (1.S << FRAC_WIDTH)) >> 1)
-    }.otherwise {
-        screenCoord.foreach(_ := 0.S)
-    }
+    val screen_idx_x = FloatRnd(screen_pos_x)
+    val screen_idx_y = FloatRnd(screen_pos_y)
+    val cmp00 = !screen_pos_x.sign
+    val cmp01 = screen_idx_x < SCREEN_H.U
+    val cmp10 = !screen_pos_y.sign
+    val cmp11 = screen_idx_y < SCREEN_V.U
 
-    val screenX =
-        (((screenCoord(0).asSInt * SCREEN_H.S) + (1.S << FRAC_WIDTH - 1)) >> FRAC_WIDTH).asUInt
-    val screenY =
-        ((SCREEN_V.S - ((screenCoord(
-            1
-        ).asSInt * SCREEN_V.S) + (1.S << FRAC_WIDTH - 1)) >> FRAC_WIDTH)).asUInt
-
-    val inScreen = screenX < SCREEN_H.U && screenY < SCREEN_V.U
-    val isValid  = io.in.inputValid && inScreen && !io.in.overflow && !divByZero
-
-    val outReg = RegInit(0.U.asTypeOf(new MipOutputData()))
-    outReg.valid       := isValid
-    outReg.density     := Mux(isValid, io.in.density, 0.U)
-    outReg.screenPos.x := screenX
-    outReg.screenPos.y := screenY
-
-    io.out := outReg
+    val in_screen = cmp00 && cmp01 && cmp10 && cmp11
+    val out_reg = RegInit(0.U.asTypeOf(new MipOutputData))
+    out_reg.valid := valid && in_screen
+    out_reg.density := density
+    out_reg.screenPos.x := screen_idx_x
+    out_reg.screenPos.y := screen_idx_y
+    io.out := out_reg
 }
 
-class ComputeUnit(gridResolution: Int, gridSize: Int) extends Module {
+class ComputeUnit(val gridResolution: Int, val gridSize: Int) extends Module {
     val io = IO(new Bundle {
         val in  = Input(new MipInputData())
         val out = Output(new MipOutputData())
     })
 
-    val worldCoordStage          = Module(new WorldCoordStage(gridResolution, gridSize))
-    val mvpTransformStage        = Module(new MVPTransformStage(gridResolution, gridSize))
-    val perspectiveDivisionStage = Module(new PerspectiveDivisionStage(gridResolution, gridSize))
+    val world_coord_stage   = Module(new WorldCoordStage(gridResolution, gridSize))
+    val mvp_transform_stage = Module(new MVPTransformStage(gridResolution, gridSize))
+    val perspective_division_stage =
+        Module(new PerspectiveDivisionStage(gridResolution, gridSize))
 
-    worldCoordStage.io.in := io.in
+    world_coord_stage.io.in          := io.in
+    mvp_transform_stage.io.mvpInfo   := io.in.mvpInfo
+    mvp_transform_stage.io.in        := world_coord_stage.io.out
+    perspective_division_stage.io.in := mvp_transform_stage.io.out
 
-    mvpTransformStage.io.in      := worldCoordStage.io.out
-    mvpTransformStage.io.mvpInfo := io.in.mvpInfo
-
-    perspectiveDivisionStage.io.in := mvpTransformStage.io.out
-
-    val pipelineDepth = 3 // 假设总共有3个流水线阶段
-    val delayCounter  = RegInit(0.U(log2Ceil(pipelineDepth + 1).W))
-
-    when(io.in.valid && !io.in.pipelineStall) {
-        when(delayCounter === pipelineDepth.U) {
-            delayCounter := delayCounter
-        }.otherwise {
-            delayCounter := delayCounter + 1.U
-        }
-    }.elsewhen(io.in.pipelineStall) {
-        delayCounter := 0.U
-    }
-
-    val outputReg = RegNext(perspectiveDivisionStage.io.out)
-    outputReg.valid := outputReg.valid && (delayCounter === pipelineDepth.U)
-
-    io.out := outputReg
+    io.out := perspective_division_stage.io.out
 }
 
-object Main extends App {
-    ChiselStage.emitSystemVerilogFile(new PerspectiveDivisionStage(128, 64))
-}

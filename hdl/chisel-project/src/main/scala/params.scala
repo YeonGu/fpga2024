@@ -10,7 +10,7 @@ object Params {
 
     val IMAGE_SIZE     = 1024
     val VOXEL_POS_XLEN = 9
-    val BASEPOS_XLEN = 16
+    val BASE_POS_XLEN = 16
     
     val AXI_DDR_ADDR_WIDTH = 32
     val AXI_DDR_DATA_WIDTH = 32

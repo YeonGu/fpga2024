@@ -3,6 +3,7 @@ package __global__
 import chisel3._
 import chisel3.util.log2Up
 import __global__.Params._
+import rendering.FloatPoint
 
 class ScreenPos extends Bundle {
     val x = UInt(log2Up(SCREEN_H).W)
@@ -16,8 +17,8 @@ class VoxelVector3 extends Bundle {
 }
 
 /* 3x3 MVP Matrix with elements whose bitdepth is MVP_MAT_BITDEPTH */
-class Mat3x3 extends Bundle {
-    val mat = Vec(3, Vec(3, SInt(MVP_MAT_BITDEPTH.W)))
+class Mat3x4 extends Bundle {
+    val mat = Vec(3, Vec(4, new FloatPoint()))
 }
 
 import chisel3._
