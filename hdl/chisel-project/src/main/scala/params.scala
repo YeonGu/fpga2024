@@ -11,6 +11,7 @@ object Params {
     val IMAGE_SIZE     = 512
     val VOXEL_COUNT    = IMAGE_SIZE * IMAGE_SIZE * IMAGE_SIZE
     val VOXEL_POS_XLEN = 3 * log2Ceil(IMAGE_SIZE)
+    val BASE_POS_XLEN  = 16
 
     val AXI_DDR_ADDR_WIDTH = 32
     val AXI_DDR_DATA_WIDTH = 32

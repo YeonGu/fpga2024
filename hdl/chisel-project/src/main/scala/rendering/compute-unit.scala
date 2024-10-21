@@ -6,7 +6,7 @@ import chisel3.util._
 import rendering.{MipInputData, MipOutputData}
 import __global__._
 import __global__.Params._
-import fixedpoint._
+// import fixedpoint._
 
 object CUParams {
     val FRAC_WIDTH              = 6
