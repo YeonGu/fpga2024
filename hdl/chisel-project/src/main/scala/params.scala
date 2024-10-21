@@ -5,13 +5,13 @@ import chisel3.util._
 
 object Params {
     val DENS_DEPTH = 8
-    val SCREEN_H   = 640 
-    val SCREEN_V   = 480
+    val SCREEN_H   = 960
+    val SCREEN_V   = 720
 
-    val IMAGE_SIZE     = 1024
-    val VOXEL_POS_XLEN = 9
-    val BASE_POS_XLEN = 16
-    
+    val IMAGE_SIZE     = 512
+    val VOXEL_COUNT    = IMAGE_SIZE * IMAGE_SIZE * IMAGE_SIZE
+    val VOXEL_POS_XLEN = 3 * log2Ceil(IMAGE_SIZE)
+
     val AXI_DDR_ADDR_WIDTH = 32
     val AXI_DDR_DATA_WIDTH = 32
 

@@ -27,33 +27,43 @@ import chisel3.util._
 /** AXI4 interface definition using Decoupled */
 class AXI4InterfaceM(addrWidth: Int, dataWidth: Int) extends Bundle {
     // Write address channel
-    val awaddr  = Output(UInt(addrWidth.W))
-    val awprot  = Output(UInt(3.W))
-    val awvalid = Output(Bool())
-    val awready = Input(Bool())
+    val aw = new Bundle {
+        val addr  = Output(UInt(addrWidth.W))
+        val prot  = Output(UInt(3.W))
+        val valid = Output(Bool())
+        val ready = Input(Bool())
+    }
 
     // Write data channel
-    val wdata  = Output(UInt(dataWidth.W))
-    val wstrb  = Output(UInt((dataWidth / 8).W))
-    val wvalid = Output(Bool())
-    val wready = Input(Bool())
+    val w = new Bundle {
+        val data  = Output(UInt(dataWidth.W))
+        val strb  = Output(UInt((dataWidth / 8).W))
+        val valid = Output(Bool())
+        val ready = Input(Bool())
+    }
 
     // Write response channel
-    val bresp  = Input(UInt(2.W))
-    val bvalid = Input(Bool())
-    val bready = Output(Bool())
+    val b = new Bundle {
+        val resp  = Input(UInt(2.W))
+        val valid = Input(Bool())
+        val ready = Output(Bool())
+    }
 
     // Read address channel
-    val araddr  = Output(UInt(addrWidth.W))
-    val arprot  = Output(UInt(3.W))
-    val arvalid = Output(Bool())
-    val arready = Input(Bool())
+    val ar = new Bundle {
+        val addr  = Output(UInt(addrWidth.W))
+        val prot  = Output(UInt(3.W))
+        val valid = Output(Bool())
+        val ready = Input(Bool())
+    }
 
     // Read data channel
-    val rdata  = Input(UInt(dataWidth.W))
-    val rresp  = Input(UInt(2.W))
-    val rvalid = Input(Bool())
-    val rready = Output(Bool())
+    val r = new Bundle {
+        val data  = Input(UInt(dataWidth.W))
+        val resp  = Input(UInt(2.W))
+        val valid = Input(Bool())
+        val ready = Output(Bool())
+    }
 }
 
 /* Xilinx FIFO IP IO wrapping. From the perspective of FIFO IP. */
