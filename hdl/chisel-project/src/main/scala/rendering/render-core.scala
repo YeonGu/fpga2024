@@ -24,7 +24,7 @@ class RenderCoreInputData extends Bundle {
 }
 
 class RenderCoreOutputData extends Bundle {
-    val res_len      = DENS_DEPTH + log2Up(SCREEN_V) + log2Up(SCREEN_H)
+    val res_len      = DENS_DEPTH + log2Up(SCREEN_V) + log2Up(SCREEN_H) + 4
     val valid        = Output(Bool())
     val packedResult = Output(UInt((CORENUMS * res_len).W))
 }
@@ -63,7 +63,7 @@ class RenderCore(val gridResolution: Int, val gridSize: Int) extends Module {
     val result = VecInit(CUs.zipWithIndex.map { case (cu, _) =>
         Mux(
             allValid,
-            Cat(cu.io.out.screenPos.y, cu.io.out.screenPos.x, cu.io.out.density),
+            Cat(0.U(2.W), cu.io.out.screenPos.y, 0.U(2.W), cu.io.out.screenPos.x, cu.io.out.density),
             0.U
         )
     })
@@ -72,4 +72,8 @@ class RenderCore(val gridResolution: Int, val gridSize: Int) extends Module {
 
     val resultReg = RegNext(Cat(result))
     io.out.packedResult := resultReg
+}
+
+object Main extends App {
+    ChiselStage.emitSystemVerilogFile(new RenderCore(512, 256), Array("--target-dir", "generated"))
 }
