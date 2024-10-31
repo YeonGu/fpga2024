@@ -32,8 +32,8 @@ class WorldCoordStage(val gridResolution: Int, val gridSize: Int) extends Module
         val in  = new MipInputData()
         val out = Output(new StageIO())
     })
-
-    val ratio        = 0x800.S(INTERMEDIATE_WIDTH.W)
+    
+    val ratio        = ((0x1000.S(INTERMEDIATE_WIDTH.W) >> log2Ceil(gridResolution)) << log2Ceil(gridSize)).asSInt
     val voxel_offset = Wire(Vec(3, SInt(INTERMEDIATE_WIDTH.W)))
     for (i <- 0 until 3) {
         voxel_offset(i) := Cat(
@@ -67,7 +67,7 @@ class WorldCoordStage(val gridResolution: Int, val gridSize: Int) extends Module
     }
 
     val out_reg = RegInit(0.U.asTypeOf(new StageIO()))
-    out_reg.valid    := io.in.valid && !io.in.pipelineStall
+    out_reg.valid    := io.in.valid
     out_reg.density  := io.in.density
     out_reg.data(0)  := Fixed2Float(world_coord_tmp(0)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
     out_reg.data(1)  := Fixed2Float(world_coord_tmp(1)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
@@ -115,8 +115,8 @@ class PerspectiveDivisionStage(val gridResolution: Int, val gridSize: Int) exten
         val out = Output(new MipOutputData())
     })
 
-    val valid = ShiftRegister(io.in.valid, 12)
-    val density = ShiftRegister(io.in.density, 12)
+    val valid = ShiftRegister(io.in.valid, 13)
+    val density = ShiftRegister(io.in.density, 13)
     // pre-defined constants
     val focal = FloatPoint(0.B, "b1111".U, "b100000000".U)
     val focal_aspect = FloatPoint(0.B, "b1111".U, "b1010101010".U)
