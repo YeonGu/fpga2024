@@ -57,6 +57,6 @@ class MatMul(matSize: Int, bitWidth: Int, fracWidth: Int, pipelineStages: Int, s
     io.out_valid := shift_reg
 }
 
-object Main extends App {
-    ChiselStage.emitSystemVerilogFile(new MatMul(3, 16, 4, 3, false))
-}
+// object Main extends App {
+//     ChiselStage.emitSystemVerilogFile(new MatMul(3, 16, 4, 3, false))
+// }

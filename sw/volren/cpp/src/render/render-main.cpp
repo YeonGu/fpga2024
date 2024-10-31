@@ -78,6 +78,7 @@ void render_entry()
                     //           << "\n sample opacity: " << samples.back().opacity << std::endl;
                 }
                 if(opacity > 0.95f) {
+                    // printf("terminated ray\n");
                     break;
                 }
             }

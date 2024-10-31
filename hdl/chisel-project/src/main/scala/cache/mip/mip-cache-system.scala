@@ -20,7 +20,7 @@ class MipCacheSystem extends Module {
                 Flipped(new XilinxFIFOIO(MIP_DATA_WIDTH, MIP_RESULT_FIFO_DEPTH))
             ) /* Read from Result FIFO */
         val axi4Port =
-            new AXI4InterfaceM(AXI_DDR_ADDR_WIDTH, AXI_DDR_DATA_WIDTH) /* AXI4 interface */
+            new AXI4InterfaceM(AXIS_ADDR_WIDTH, AXIS_DATA_WIDTH) /* AXI4 interface */
     })
 }
 

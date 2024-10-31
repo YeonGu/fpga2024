@@ -13,6 +13,8 @@ import __global__.Params._
 import os.proc
 import __global__.ScreenPos
 import mip.xilinx.proc_queue_fifo
+import rendering.RenderCore
+import rendering.CoreParams.CORENUMS
 
 class calcChannelIn extends Bundle {
     val need_data = Output(Bool())
@@ -44,15 +46,26 @@ class MipCalcChannel extends Module {
     val out = IO(new calcChannelOut())
 
     /* Modules */
-    val proc_queue   = Module(new proc_queue_fifo())
-    val mip_core     = Module(new IntensityProjectionCore())
+
+    // PROCESS QUEUE
+    // From data fetcher, store density data.
+    // write: from data fetcher. 128bit width (TODO:)
+    // read:  to mip core. [N_CORES * 8bit] width
+    // read:  disabled when result_queue is almost full.
+    val proc_queue = Module(new proc_queue_fifo())
+
+    // RENDER CORE
+    // val mip_core     = Module(new IntensityProjectionCore())
+    val render_core = Module(new RenderCore())
+
+    // RESULT QUEUE
     val result_queue = Module(new result_cache_fifo())
 
     // val addrCounter = RegInit(0.U(VOXEL_POS_XLEN.W))
     val addr_reg = RegInit(0.U(VOXEL_POS_XLEN.W))
     // val x_reg      = RegInit(0.U(log2Ceil(SCREEN_H).W))
     // val y_reg      = RegInit(0.U(log2Ceil(SCREEN_V).W))
-    val proc_count = RegInit(0.U(log2Ceil(WORKSET_SIZE).W))
+    val proc_count = RegInit(0.U(log2Ceil(WORKSET_WR_DEPTH).W))
 
     // proc_queue.io.clk   := clock
     // proc_queue.io.rst   := reset
@@ -69,8 +82,6 @@ class MipCalcChannel extends Module {
     switch(channel_state) {
         is(states.IDLE) {
             proc_count := 0.U
-            // x_reg      := Mux(in.screen_pos_wren, in.x_reg_wrdata, 0.U)
-            // y_reg      := Mux(in.screen_pos_wren, in.y_reg_wrdata, 0.U)
 
             addr_reg := Mux(in.voxel_addr_reg_wren, in.voxel_addr_reg_wrdata, addr_reg)
             when(!proc_queue.io.empty) { channel_state := states.CALC }
@@ -84,10 +95,14 @@ class MipCalcChannel extends Module {
         // }
         is(states.CALC) {
             /*  increse 1 if handshake is valid */
-            proc_count := Mux(proc_queue.io.valid, proc_count + 1.U, proc_count)
-            addr_reg   := Mux(proc_queue.io.valid, addr_reg + N_MIP_CORES.U, addr_reg)
+            proc_count := Mux(proc_queue.io.rd_data_count <= 1.U, proc_count + 1.U, proc_count)
+            addr_reg := Mux(
+                proc_queue.io.rd_data_count <= 1.U,
+                addr_reg + CORENUMS.U,
+                addr_reg
+            )
 
-            when(proc_count === (WORKSET_SIZE - 1).U) {
+            when(proc_count === (WORKSET_WR_DEPTH - 1).U) {
                 channel_state := states.IDLE
             }
         }
@@ -98,7 +113,7 @@ class MipCalcChannel extends Module {
         if (n == 1) RegNext(x) else delay(RegNext(x), n - 1)
     }
 
-    val res_almost_full = result_queue.io.almost_full
+    // val res_almost_full = result_queue.io.almost_full
 
     /* proc queue IO */
     in.need_data          := (channel_state === states.IDLE)
@@ -107,18 +122,18 @@ class MipCalcChannel extends Module {
 
     /* proc_queue ==> mip_core */
     proc_queue.io.rd_en  := (channel_state === states.CALC) && (!result_queue.io.almost_full)
-    mip_core.in.density  := proc_queue.io.rd_data
-    mip_core.in.voxelPos := addr_reg
-    mip_core.in.valid    := proc_queue.io.valid
+    // mip_core.in.density  := proc_queue.io.rd_data
+    // mip_core.in.voxelPos := addr_reg
+    // mip_core.in.valid    := proc_queue.io.valid
 
     /* mip_core ==> result_queue */
     // TODO.
     val packed_result = Wire(UInt(32.W))
-    packed_result := Cat(
-        mip_core.out.screenPos.x,
-        mip_core.out.screenPos.y,
-        mip_core.out.density
-    )
+    // packed_result := Cat(
+    //     mip_core.out.screenPos.x,
+    //     mip_core.out.screenPos.y,
+    //     mip_core.out.density
+    // )
 
     /* result IO */
     val dec = Module(new ResultDecode())

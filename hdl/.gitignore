@@ -1,1 +1,6 @@
 .metals/*
+testbench/*/obj_dir/*
+.vscode/*
+*.gtkw
+*.vcd
+

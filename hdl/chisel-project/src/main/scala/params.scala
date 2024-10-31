@@ -13,8 +13,8 @@ object Params {
     val VOXEL_POS_XLEN = 3 * log2Ceil(IMAGE_SIZE)
     val BASE_POS_XLEN  = 16
 
-    val AXI_DDR_ADDR_WIDTH = 32
-    val AXI_DDR_DATA_WIDTH = 32
+    val AXIS_ADDR_WIDTH = 32
+    val AXIS_DATA_WIDTH = 64
 
     val MVP_MAT_BITDEPTH = 16
 
@@ -22,6 +22,7 @@ object Params {
     val MIP_CORES             = 16
     val MIP_DATA_WIDTH        = 16
     val MIP_RESULT_FIFO_DEPTH = 512
+
     /* MIP CACHING */
     val MIP_WB_CHANNELS      = 8
     val MIP_CACHE_GROUPS     = 4
@@ -33,7 +34,7 @@ object GeneratedParams {
     import Params._
 
     val SCREEN_SIZE       = SCREEN_H * SCREEN_V
-    val SCREEN_ADDR_WIDTH = log2Ceil(SCREEN_SIZE)
+    val SCREEN_ADDR_WIDTH = log2Ceil(SCREEN_H) + log2Ceil(SCREEN_V)
 
     /* example. The MIP Cache address.
     assume that the screen size is 1920x1080 < 2^21, and the cache block size is 512.

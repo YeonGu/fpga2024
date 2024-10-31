@@ -15,8 +15,8 @@
 #define CAM_PITCH 0.0f // up-down
 #define CAM_YAW -45.0f // left-right
 
-#define THRES_SKIN
-// #define THRES_BONE
+// #define THRES_SKIN
+#define THRES_BONE
 
 /* ray tracing */
 #define MAX_TRACE_DISTANCE 5

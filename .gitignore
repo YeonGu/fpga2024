@@ -4,3 +4,5 @@
 *.bkp
 *.dtmp
 downloads/*
+proj/*
+compile_commands.json

@@ -6,9 +6,9 @@ FILES := $(TB_VFILES) $(TB_CFILES)
 
 TARGET = obj_dir/V$(TOP)
 
-VERIFLAGS := --cc --exe --build --trace -j 0 -Wall --timing\
-			 -Wno-WIDTHEXPAND -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-VARHIDDEN
-CUSTOMFLAG := -fPIE -Iobj_dir 
+VERIFLAGS += --cc --exe --build --trace -j 0 -Wall --timing\
+			 -Wno-WIDTHEXPAND -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-VARHIDDEN -Wno-PINCONNECTEMPTY -Wno-UNDRIVEN
+CUSTOMFLAG += -fPIE -Iobj_dir 
 
 VERILATE := verilator $(VERIFLAGS) -CFLAGS "$(CUSTOMFLAG)" $(FILES) --top-module $(TOP) # -LDFLAGS "$(LIBS)"
 
