@@ -11,7 +11,6 @@ import __global__._
 
 class MipInputData extends Bundle {
     val valid         = Input(Bool())
-    val pipelineStall = Input(Bool())
     val density       = Input(UInt(DENS_DEPTH.W))
     val voxelPos      = Input(Vec(3, UInt(VOXEL_POS_XLEN.W)))
     val mvpInfo       = Input(new Mat3x4())
