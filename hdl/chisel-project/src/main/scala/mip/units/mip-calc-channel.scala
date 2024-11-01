@@ -15,6 +15,7 @@ import __global__.ScreenPos
 import mip.xilinx.proc_queue_fifo
 import rendering.RenderCore
 import rendering.CoreParams.CORENUMS
+import __global__.Mat3x4
 
 class calcChannelIn extends Bundle {
     val need_data = Output(Bool())
@@ -44,6 +45,9 @@ class calcChannelOut extends Bundle {
 class MipCalcChannel extends Module {
     val in  = IO(new calcChannelIn())
     val out = IO(new calcChannelOut())
+    val ctrl = IO(new Bundle {
+        val mvpInfo = Input(new Mat3x4())
+    })
 
     /* Modules */
 
@@ -56,16 +60,16 @@ class MipCalcChannel extends Module {
 
     // RENDER CORE
     // val mip_core     = Module(new IntensityProjectionCore())
-    val render_core = Module(new RenderCore())
+    val render_core = Module(new RenderCore(128, 64))
 
     // RESULT QUEUE
     val result_queue = Module(new result_cache_fifo())
 
     // val addrCounter = RegInit(0.U(VOXEL_POS_XLEN.W))
-    val addr_reg = RegInit(0.U(VOXEL_POS_XLEN.W))
+    val voxel_addr = RegInit(0.U(VOXEL_POS_XLEN.W))
     // val x_reg      = RegInit(0.U(log2Ceil(SCREEN_H).W))
     // val y_reg      = RegInit(0.U(log2Ceil(SCREEN_V).W))
-    val proc_count = RegInit(0.U(log2Ceil(WORKSET_WR_DEPTH).W))
+    val proc_count = RegInit(0.U(log2Ceil(WORKSET_WR_CNT).W))
 
     // proc_queue.io.clk   := clock
     // proc_queue.io.rst   := reset
@@ -83,28 +87,22 @@ class MipCalcChannel extends Module {
         is(states.IDLE) {
             proc_count := 0.U
 
-            addr_reg := Mux(in.voxel_addr_reg_wren, in.voxel_addr_reg_wrdata, addr_reg)
+            voxel_addr := Mux(in.voxel_addr_reg_wren, in.voxel_addr_reg_wrdata, voxel_addr)
             when(!proc_queue.io.empty) { channel_state := states.CALC }
         }
-        // is(states.FETCH) {
-        //     proc_count := 0.U
-        //     when(in.need_data && in.addr_reg_wren) {
-        //         status   := states.CALC
-        //         addr_reg := in.addr_reg_wrdata
-        //     }
-        // }
         is(states.CALC) {
-            /*  increse 1 if handshake is valid */
+            // increse 1 if remains data in proc_queue
+            // it is correct to use rd_data_count <= 1 as a valid signal. I dont fucking know why.
             proc_count := Mux(proc_queue.io.rd_data_count <= 1.U, proc_count + 1.U, proc_count)
-            addr_reg := Mux(
-                proc_queue.io.rd_data_count <= 1.U,
-                addr_reg + CORENUMS.U,
-                addr_reg
-            )
-
-            when(proc_count === (WORKSET_WR_DEPTH - 1).U) {
+            when(proc_count === (WORKSET_RD_CNT - 1).U) {
                 channel_state := states.IDLE
             }
+
+            voxel_addr := Mux(
+                proc_queue.io.rd_data_count <= 1.U,
+                voxel_addr + CORENUMS.U,
+                voxel_addr
+            )
         }
     }
 
@@ -115,16 +113,23 @@ class MipCalcChannel extends Module {
 
     // val res_almost_full = result_queue.io.almost_full
 
-    /* proc queue IO */
+    // PROC QUEUE
     in.need_data          := (channel_state === states.IDLE)
     proc_queue.io.wr_en   := in.proc_queue_wren
     proc_queue.io.wr_data := in.proc_queue_wrdata
 
     /* proc_queue ==> mip_core */
-    proc_queue.io.rd_en  := (channel_state === states.CALC) && (!result_queue.io.almost_full)
+    val result_q_almost_full = result_queue.io.wr_data_count >= (RES_CACHE_WR_DEPTH / 4 * 3).U
+    proc_queue.io.rd_en := (channel_state === states.CALC) && (!result_queue.io.almost_full)
+
     // mip_core.in.density  := proc_queue.io.rd_data
     // mip_core.in.voxelPos := addr_reg
     // mip_core.in.valid    := proc_queue.io.valid
+
+    render_core.io.in.valid := proc_queue.io.valid
+    render_core.io.in.density.zipWithIndex.foreach { case (d, idx) =>
+        d := proc_queue.io.rd_data(8 * (idx + 1) - 1, 8 * idx)
+    }
 
     /* mip_core ==> result_queue */
     // TODO.

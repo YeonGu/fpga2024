@@ -37,3 +37,12 @@ class datamover_m_axis_s2mm extends Bundle {
     val tvalid = Output(Bool())
     val tready = Input(Bool())
 }
+
+// BRAM PORT
+class brama_gen_port(data_width: Int) extends Bundle {
+    val addra = Input(UInt(32.W))
+    val dina  = Input(UInt(32.W))
+    val douta = Output(UInt(32.W))
+    val ena   = Input(Bool())
+    val wea   = Input(Bool())
+}

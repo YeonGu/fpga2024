@@ -10,17 +10,22 @@ object VramConfigs {
     val VRAM_ADDRB_WIDTH = log2Ceil(32 * 1024 * 3)
 }
 
-/** Build VRAM in Simple Dual Port Mode.
+/** Build VRAM in Dual Port Mode.
   *
-  * Port A. Read (din), 64bit wide. OREG = true
+  * @PortA.
+  *   Read (din), 8bit (maybe 16?) wide. OREG = true, latency = 1clk
   *
-  * Port B. Write (dout), 8bit wide
+  * @PortB.
+  *   Write (dout), 8bit wide
+  *
+  * @configs.
+  *   capacity = 32 * 1024 * 3 Bytes = 96KB
   */
 class ultra_vram extends BlackBox {
     val io = IO(new Bundle {
         // val wea = Input(Bool())
-        val ena   = Input(Bool())
         val addra = Input(UInt(VRAM_ADDRA_WIDTH.W))
+        val ena   = Input(Bool())
         val douta = Output(UInt(8.W))
         // val dina  = Input(UInt(8.W))
 

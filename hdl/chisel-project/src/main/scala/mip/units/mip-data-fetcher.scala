@@ -186,7 +186,7 @@ class MipDataFetcher extends Module {
         val IDLE, WRITE_ADDR, DISPATCH, NEXT, END = Value
     }
     val dispatch_state   = RegInit(DispatchStates.IDLE)
-    val dispatch_count   = RegInit(0.U(log2Ceil(WORKSET_WR_DEPTH).W))
+    val dispatch_count   = RegInit(0.U(log2Ceil(WORKSET_WR_CNT).W))
     val dispatch_channel = RegInit(0.U(log2Ceil(N_MIP_CHANNELS).W))
     val voxel_addr       = RegInit(0.U(VOXEL_POS_XLEN.W))
     val total_dispatched = RegInit(0.U(32.W))
@@ -196,7 +196,7 @@ class MipDataFetcher extends Module {
     switch(dispatch_state) {
         is(DispatchStates.IDLE) {
             when(
-                need && dispatch_fifo.io.data_count >= (WORKSET_WR_DEPTH).U // FIXME: parameterize this
+                need && dispatch_fifo.io.data_count >= (WORKSET_WR_CNT).U // FIXME: parameterize this
             ) {
                 dispatch_state   := DispatchStates.WRITE_ADDR
                 dispatch_channel := PriorityEncoder(need_datas)
@@ -207,18 +207,18 @@ class MipDataFetcher extends Module {
             dispatch_state := DispatchStates.DISPATCH
         }
         is(DispatchStates.DISPATCH) {
-            when(dispatch_count === (WORKSET_WR_DEPTH - 1).U) { // FIXME: dispatch count -> 0
+            when(dispatch_count === (WORKSET_WR_CNT - 1).U) { // FIXME: dispatch count -> 0
                 // dispatch_state := DispatchStates.IDLE
                 dispatch_state := Mux(
                     total_dispatched === (n_dispatch_total - 1).U,
                     DispatchStates.IDLE,
                     DispatchStates.NEXT
                 )
-                voxel_addr := voxel_addr + WORKSET_WR_DEPTH.U * (PROC_QUEUE_WR_WIDTH / 8).U
+                voxel_addr := voxel_addr + WORKSET_WR_CNT.U * (PROC_QUEUE_WR_WIDTH / 8).U
             }
         }
         is(DispatchStates.NEXT) {
-            when(need && dispatch_fifo.io.data_count >= (WORKSET_WR_DEPTH).U) {
+            when(need && dispatch_fifo.io.data_count >= (WORKSET_WR_CNT).U) {
                 dispatch_state   := DispatchStates.WRITE_ADDR
                 dispatch_channel := PriorityEncoder(need_datas)
                 total_dispatched := total_dispatched + 1.U

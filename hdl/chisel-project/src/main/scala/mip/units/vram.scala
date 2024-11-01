@@ -1,5 +1,6 @@
 package mip.units
 
+import circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 import mip.MipConfigs._
@@ -9,90 +10,116 @@ import __global__.Params._
 
 class MipVram extends Module {
     val io = IO(new Bundle {
-        val projection_res      = Vec(VRAM_CHANNELS, Flipped(new calcChannelOut()))
-        val vram_start_transfer = Input(Bool())
-        val m_axis_s2mm         = new datamover_m_axis_s2mm() // VRAM stream ==> Memory Map
+        val calc_res = Vec(N_MIP_CHANNELS, Flipped(new calcChannelOut()))
+        val en_minip = Input(Bool())
+        val ram_port = new brama_gen_port(64)
     })
 
-    val vram_channels = Seq.fill(VRAM_CHANNELS)(Module(new VramChannel()))
+    val vram_channels = Seq.fill(VRAM_CHANNELS)(Module(new MipVramChannel()))
 
     // Connect MIP_channels ==> VRAM_channels
+    // projection_res <> mip channels
+    // data -> vram_channels; rden <- |vram_channels
     vram_channels.zipWithIndex.foreach { case (channel, i) =>
         channel.io.channel_id := i.U
-
-        channel.io.projection_res(i).data_valid := io.projection_res(i).data_valid
-        channel.io.projection_res(i).density    := io.projection_res(i).density
-        channel.io.projection_res(i).screen_pos := io.projection_res(i).screen_pos
+        channel.io.en_minip   := io.en_minip
+        channel.io.projection_res.zipWithIndex.foreach { case (res, j) =>
+            res.data_valid := io.calc_res(j).data_valid
+            res.density    := io.calc_res(j).density
+            res.screen_pos := io.calc_res(j).screen_pos
+        }
     }
-    io.projection_res.zipWithIndex.foreach { case (res, i) =>
+    io.calc_res.zipWithIndex.foreach { case (res, i) =>
         res.rden := vram_channels.map(_.io.projection_res(i).rden).reduce(_ || _)
     }
 
-    /* When everything within a frame is processed, take the vram_start_transfer signal
-     * and start streaming the data through AXIS_S2MM channel.
-     * The channel is high-bits crossed coded. which means we need to concat the data
-     * from all 8 channels to form a 64-bit data.
-     * The read command is sent through ReadChannel.
-     */
-
+    // another way to use the mipvram is bram_port.
+    // PS --- AXI BRAM CTRL --- MIPVRAM
+    // Concat all channels' data together -> 64bit width.
+    // Now the bram_port command will overlay commands from calc_res. This is a "force read" command.
+    vram_channels.foreach { channel =>
+        channel.io.read_channel.rden := io.ram_port.ena
+        channel.io.read_channel.addr := io.ram_port.addra >> log2Ceil(VRAM_CHANNELS)
+    }
+    io.ram_port.douta := vram_channels.map(_.io.read_channel.dout).reduce(Cat(_, _))
 }
 
-class ReadChannel extends Bundle {
+class RamRead extends Bundle {
     val rden = Input(Bool())
     val addr = Input(UInt(VRAM_ADDRA_WIDTH.W))
     val dout = Output(UInt(DENS_DEPTH.W))
 }
 
-class VramChannel extends Module {
+/** @brief
+  *   Video RAM module implementation. VRAM and MIP Compare pipeline
+  */
+class MipVramChannel extends Module {
     val io = IO(new Bundle {
         val channel_id     = Input(UInt(log2Ceil(VRAM_CHANNELS).W))
         val en_minip       = Input(Bool())
-        val projection_res = Vec(VRAM_CHANNELS, Flipped(new calcChannelOut()))
-        val read_channel   = new ReadChannel()
+        val projection_res = Vec(N_MIP_CHANNELS, Flipped(new calcChannelOut())) // fetch and response
+
+        val read_channel = new RamRead() // read command from PS --- AXI BRAM CTRL
     })
 
     val vram = Module(new ultra_vram())
 
-    /* Response. fetch & decode */
-    val req_channels = io.projection_res.map { res =>
+    // ABOUT: MIP VRAM operation pipeline
+    // | RESP/DF/DEC | READ COMMAND | READ DATA - CMP - WRITE CMD
+    // |             |  ADDR CALC   |  READ CMD DELAYED
+
+    // Response, fetch & decode
+    // needs first-word-fall-through fifo for low latency cache
+    // select a channel with priority encoder
+    val channel_req = io.projection_res.map { res =>
         res.data_valid &&
         res.screen_pos.x(log2Ceil(VRAM_CHANNELS) - 1, 0) === io.channel_id
     }
-    val need        = req_channels.reduce(_ || _)
-    val sel_channel = PriorityEncoder(req_channels)
+    val need        = channel_req.reduce(_ || _)
+    val sel_channel = PriorityEncoder(channel_req)
     io.projection_res.zipWithIndex.foreach { case (res, i) =>
         res.rden := (i.U === sel_channel) && need
     }
 
-    val df_result = io.projection_res(sel_channel)
+    val df_result = io.projection_res(sel_channel) // fetched result
 
-    /* read command gen. screen_pos.x/y ==> addra; valid => valid;  */
-    val rd_cmd_reg = RegInit(new Bundle {
-        val valid       = false.B
-        val rd_addr     = 0.U(VRAM_ADDRA_WIDTH.W)
-        val density     = 0.U(DENS_DEPTH.W)
-        val byte_offset = 0.U(3.W)
-    })
-    rd_cmd_reg.valid := need
+    // read command gen. screen_pos.x/y ==> addra; valid => valid;
+    val rd_cmd = new Bundle {
+        val valid   = Bool()
+        val rd_addr = UInt(VRAM_ADDRA_WIDTH.W)
+        val density = UInt(DENS_DEPTH.W)
+    }
+    val rd_cmd_reg = RegInit(0.U.asTypeOf(rd_cmd))
+    rd_cmd_reg.valid   := need
     rd_cmd_reg.rd_addr := ((df_result.screen_pos.y * SCREEN_H.U + df_result.screen_pos.x) / VRAM_CHANNELS.U)
     rd_cmd_reg.density := df_result.density
-    // rd_cmd_reg.byte_offset := ((df_result.screen_pos.y * SCREEN_H.U + df_result.screen_pos.x) / VRAM_CHANNELS.U) % 8.U
 
-    vram.io.ena   := rd_cmd_reg.valid || io.read_channel.rden
+    val vram_rden = rd_cmd_reg.valid || io.read_channel.rden
     vram.io.addra := Mux(io.read_channel.rden, io.read_channel.addr, rd_cmd_reg.rd_addr)
-    /* read delay */
-    val rd_delay = RegNext(rd_cmd_reg)
 
-    /* read data & compare */
+    // read delay & data & compare & write
+    val rd_cmd_delay = RegNext(rd_cmd_reg)
     val prev_density = vram.io.douta
-    // val density  = (mem_data >> (rd_delay.byte_offset * 8.U))(7, 0)
-    val wben =
-        Mux(io.en_minip, prev_density < rd_delay.density, prev_density > rd_delay.density)
-    val wbaddr = (rd_delay.rd_addr << 3) ## (rd_delay.byte_offset)
+
+    val wben   = Mux(io.en_minip, prev_density < rd_cmd_delay.density, prev_density > rd_cmd_delay.density)
+    val wbaddr = rd_cmd_delay.rd_addr
+
     vram.io.web   := wben
     vram.io.addrb := wbaddr
-    vram.io.dinb  := rd_delay.density
+    vram.io.dinb  := rd_cmd_delay.density
 
-    /* Others */
+    // others
     io.read_channel.dout := vram.io.douta
+
+    // read
+    vram.io.ena          := vram_rden || io.read_channel.rden
+    vram.io.addra        := Mux(io.read_channel.rden, io.read_channel.addr, rd_cmd_reg.rd_addr)
+    io.read_channel.dout := vram.io.douta
+}
+object Vram extends App {
+    ChiselStage.emitSystemVerilogFile(
+        new MipVram(),
+        firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info"),
+        args = Array("--target-dir", "build")
+    )
 }
