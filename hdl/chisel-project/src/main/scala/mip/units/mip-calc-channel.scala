@@ -16,8 +16,11 @@ import mip.xilinx.proc_queue_fifo
 import rendering.RenderCore
 import rendering.CoreParams.CORENUMS
 import __global__.Mat3x4
+import os.stat
+import rendering.MipOutputData
+import _root_.circt.stage.ChiselStage
 
-class calcChannelIn extends Bundle {
+class calcInput extends Bundle {
     val need_data = Output(Bool())
 
     // val x_reg_wrdata    = Input(UInt(log2Ceil(SCREEN_H).W))
@@ -29,7 +32,7 @@ class calcChannelIn extends Bundle {
     val proc_queue_wren   = Input(Bool())
     val proc_queue_wrdata = Input(UInt(PROC_QUEUE_WR_WIDTH.W))
 }
-class calcChannelOut extends Bundle {
+class calcResult extends Bundle {
     val data_valid = Output(Bool())
     val rden       = Input(Bool())
     // val screen_pos = Output(UInt(SCREEN_ADDR_WIDTH.W))
@@ -39,118 +42,99 @@ class calcChannelOut extends Bundle {
 
 /** MIP calculation channel.
   *
-  * [Data Fetcher]-----------> densityQueue =======> mipCore =======> resultCache ----------->
-  * addrReg proc * 4
+  * [Data Fetcher]-----------> densityQueue =======> mipCore =======> resultCache -----------> addrReg proc *
+  * 4
   */
 class MipCalcChannel extends Module {
-    val in  = IO(new calcChannelIn())
-    val out = IO(new calcChannelOut())
-    val ctrl = IO(new Bundle {
-        val mvpInfo = Input(new Mat3x4())
+    val in  = IO(new calcInput())
+    val out = IO(new calcResult())
+    val mipCtrl = IO(new Bundle {
+        val mvpInfo   = Input(new Mat3x4())
+        val baseCoord = Input(Vec(3, SInt(BASE_POS_XLEN.W)))
     })
 
-    /* Modules */
-
-    // PROCESS QUEUE
+    // PROCESS QUEUE & VOXEL ADDR REG
     // From data fetcher, store density data.
     // write: from data fetcher. 128bit width (TODO:)
     // read:  to mip core. [N_CORES * 8bit] width
     // read:  disabled when result_queue is almost full.
     val proc_queue = Module(new proc_queue_fifo())
+    val voxel_addr = RegInit(0.U(VOXEL_POS_XLEN.W))
+
+    proc_queue.io.clk  := clock
+    proc_queue.io.srst := reset
 
     // RENDER CORE
-    // val mip_core     = Module(new IntensityProjectionCore())
     val render_core = Module(new RenderCore(128, 64))
 
     // RESULT QUEUE
     val result_queue = Module(new result_cache_fifo())
 
-    // val addrCounter = RegInit(0.U(VOXEL_POS_XLEN.W))
-    val voxel_addr = RegInit(0.U(VOXEL_POS_XLEN.W))
-    // val x_reg      = RegInit(0.U(log2Ceil(SCREEN_H).W))
-    // val y_reg      = RegInit(0.U(log2Ceil(SCREEN_V).W))
-    val proc_count = RegInit(0.U(log2Ceil(WORKSET_WR_CNT).W))
+    result_queue.io.clk  := clock
+    result_queue.io.srst := reset
 
-    // proc_queue.io.clk   := clock
-    // proc_queue.io.rst   := reset
-    // result_queue.io.clk := clock
-    // result_queue.io.rst := reset
-
-    /* FSM */
-    object states extends ChiselEnum {
-        val IDLE, FETCH, CALC = Value
-    }
+    // FSM
+    object states extends ChiselEnum { val IDLE, LOAD, CALC = Value }
     val channel_state = RegInit(states.IDLE)
+    // val IDLE::FETCH::CALC
 
-    /* Process addrReg and procCounter in this FSM logic */
+    // Process addrReg and procCounter in this FSM logic
+    // In order to avoid conflicts, calculation starts when a whole workset
+    // is loaded into the proc_queue.
     switch(channel_state) {
         is(states.IDLE) {
-            proc_count := 0.U
-
+            // proc_count := 0.U
             voxel_addr := Mux(in.voxel_addr_reg_wren, in.voxel_addr_reg_wrdata, voxel_addr)
-            when(!proc_queue.io.empty) { channel_state := states.CALC }
+
+            when(~proc_queue.io.empty) { channel_state := states.LOAD }
+        }
+        is(states.LOAD) {
+            when(proc_queue.io.rd_data_count >= WORKSET_RD_CNT.U) { channel_state := states.CALC }
         }
         is(states.CALC) {
             // increse 1 if remains data in proc_queue
-            // it is correct to use rd_data_count <= 1 as a valid signal. I dont fucking know why.
-            proc_count := Mux(proc_queue.io.rd_data_count <= 1.U, proc_count + 1.U, proc_count)
-            when(proc_count === (WORKSET_RD_CNT - 1).U) {
-                channel_state := states.IDLE
-            }
+            // it is correct to use rd_data_count > 1 as a valid signal. I dont fucking know why.
+            // proc_count := Mux(proc_queue.io.rd_en, proc_count + 1.U, proc_count)
+            voxel_addr := Mux(proc_queue.io.valid, voxel_addr + CORENUMS.U, voxel_addr)
 
-            voxel_addr := Mux(
-                proc_queue.io.rd_data_count <= 1.U,
-                voxel_addr + CORENUMS.U,
-                voxel_addr
-            )
+            channel_state := Mux(proc_queue.io.empty, states.IDLE, states.CALC)
+            // when(proc_count === (WORKSET_RD_CNT - 1).U) { channel_state := states.IDLE }
         }
     }
 
-    /* IOs */
-    def delay(x: UInt, n: Int): UInt = {
-        if (n == 1) RegNext(x) else delay(RegNext(x), n - 1)
-    }
+    // dispatch unit -> PROC QUEUE
+    in.need_data        := (channel_state === states.IDLE)
+    proc_queue.io.wr_en := in.proc_queue_wren
+    proc_queue.io.din   := in.proc_queue_wrdata
 
-    // val res_almost_full = result_queue.io.almost_full
+    /* proc_queue ==> calc core */
+    val toomuch_res = result_queue.io.wr_data_count >= (RES_CACHE_WR_DEPTH / 4 * 3).U
+    proc_queue.io.rd_en := (channel_state === states.CALC) && (!toomuch_res)
 
-    // PROC QUEUE
-    in.need_data          := (channel_state === states.IDLE)
-    proc_queue.io.wr_en   := in.proc_queue_wren
-    proc_queue.io.wr_data := in.proc_queue_wrdata
+    render_core.io.in.valid     := proc_queue.io.valid
+    render_core.io.in.density   := proc_queue.io.dout.asTypeOf(Vec(CORENUMS, UInt(DENS_DEPTH.W)))
+    render_core.io.in.voxelPos  := voxel_addr
+    render_core.io.in.mvpInfo   := mipCtrl.mvpInfo
+    render_core.io.in.baseCoord := mipCtrl.baseCoord
+    // TODO: check density assignment in compiled verilog
+    // render_core.io.in.density.zipWithIndex.foreach { case (d, idx) =>
+    //     d := proc_queue.io.rd_data(8 * (idx + 1) - 1, 8 * idx)
+    // }
 
-    /* proc_queue ==> mip_core */
-    val result_q_almost_full = result_queue.io.wr_data_count >= (RES_CACHE_WR_DEPTH / 4 * 3).U
-    proc_queue.io.rd_en := (channel_state === states.CALC) && (!result_queue.io.almost_full)
-
-    // mip_core.in.density  := proc_queue.io.rd_data
-    // mip_core.in.voxelPos := addr_reg
-    // mip_core.in.valid    := proc_queue.io.valid
-
-    render_core.io.in.valid := proc_queue.io.valid
-    render_core.io.in.density.zipWithIndex.foreach { case (d, idx) =>
-        d := proc_queue.io.rd_data(8 * (idx + 1) - 1, 8 * idx)
-    }
+    // RENDER CORE -> RES QUEUE
 
     /* mip_core ==> result_queue */
-    // TODO.
-    val packed_result = Wire(UInt(32.W))
-    // packed_result := Cat(
-    //     mip_core.out.screenPos.x,
-    //     mip_core.out.screenPos.y,
-    //     mip_core.out.density
-    // )
+    val render_result = render_core.io.out // valid and packed results
+    result_queue.io.wr_en := render_result.valid
+    result_queue.io.din   := render_result.packedResult
 
-    /* result IO */
-    val dec = Module(new ResultDecode())
-    dec.io.code := result_queue.io.rd_data
+    // Result queue => calc result (-> VRAM)
+    val res_fw_dec = result_queue.io.rd_data.asTypeOf(new MipOutputData())
 
-    out.density           := dec.io.density
-    out.screen_pos        := dec.io.screen_pos
-    out.data_valid        := !result_queue.io.empty
-    result_queue.io.rd_en := out.rden
-
-    val decoder = Module(new ResultDecode())
-    decoder.io.code := result_queue.io.rd_data
+    result_queue.io.rd_en := out.rden || ~(res_fw_dec.valid)
+    out.data_valid        := (!result_queue.io.empty) && res_fw_dec.valid
+    out.density           := res_fw_dec.density
+    out.screen_pos        := res_fw_dec.screenPos
 }
 
 class ResultEncode extends Module {
@@ -175,4 +159,12 @@ class ResultDecode extends Module {
     )
     io.screen_pos.y := io.code(DENS_DEPTH + log2Ceil(SCREEN_V) - 1, DENS_DEPTH)
     io.density      := io.code(DENS_DEPTH, 0)
+}
+
+object CalcChannel extends App {
+    ChiselStage.emitSystemVerilogFile(
+        new MipCalcChannel(),
+        firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info"),
+        args = Array("--target-dir", "build")
+    )
 }

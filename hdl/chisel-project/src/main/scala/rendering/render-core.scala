@@ -10,6 +10,7 @@ import rendering.CUParams._
 
 object CoreParams {
     val CORENUMS = 4
+    val RES_LEN  = 32
 }
 
 import CoreParams._
@@ -24,9 +25,8 @@ class RenderCoreInputData extends Bundle {
 }
 
 class RenderCoreOutputData extends Bundle {
-    val res_len      = DENS_DEPTH + log2Up(SCREEN_V) + log2Up(SCREEN_H) + 4
     val valid        = Output(Bool())
-    val packedResult = Output(UInt((CORENUMS * res_len).W))
+    val packedResult = Output(UInt((CORENUMS * RES_LEN).W))
 }
 
 class RenderCore(val gridResolution: Int, val gridSize: Int) extends Module {
@@ -58,22 +58,38 @@ class RenderCore(val gridResolution: Int, val gridSize: Int) extends Module {
     CUs(3).io.in.voxelPos(0) := voxelPos_x_plus_3
 
     // Output logic
+    /*
+    class MipOutputData extends Bundle {
+        val valid     = Output(Bool())
+        val density   = Output(UInt(DENS_DEPTH.W))
+        val screenPos = Output(new ScreenPos())
+    } */
     val allValid = CUs.map(_.io.out.valid).reduce(_ && _)
 
-    val result = VecInit(CUs.zipWithIndex.map { case (cu, _) =>
-        Mux(
-            allValid,
-            Cat(0.U(2.W), cu.io.out.screenPos.y, 0.U(2.W), cu.io.out.screenPos.x, cu.io.out.density),
-            0.U
-        )
+    val packedResult = Wire(UInt((CORENUMS * RES_LEN).W))
+    packedResult := CUs.zipWithIndex.map {
+        case (cu, idx) => {
+            val singleResult = Wire(UInt(RES_LEN.W))
+            singleResult := cu.io.out.asUInt
+            singleResult
+        }
+    }.reduce(Cat(_, _)).asUInt
+
+    // val resultReg = RegNext(Cat(result))
+    io.out.valid        := allValid
+    io.out.packedResult := RegNext(packedResult)
+}
+
+class packedResultDecode extends Module {
+    val io = IO(new Bundle {
+        val packedResult   = Input(UInt(32.W))
+        val decodedMipData = new MipOutputData()
     })
-
-    io.out.valid := allValid
-
-    val resultReg = RegNext(Cat(result))
-    io.out.packedResult := resultReg
+    val res = io.packedResult.asTypeOf(new MipOutputData())
+    io.decodedMipData := res
 }
 
 object Main extends App {
-    ChiselStage.emitSystemVerilogFile(new RenderCore(512, 256), Array("--target-dir", "generated"))
+    // ChiselStage.emitSystemVerilogFile(new packedResultDecode, Array("--target-dir", "build"))
+    ChiselStage.emitSystemVerilogFile(new RenderCore(512, 256), Array("--target-dir", "build"))
 }

@@ -23,6 +23,9 @@ object VramConfigs {
   */
 class ultra_vram extends BlackBox {
     val io = IO(new Bundle {
+        val clk = Input(Clock())
+        val rst = Input(Bool())
+
         // val wea = Input(Bool())
         val addra = Input(UInt(VRAM_ADDRA_WIDTH.W))
         val ena   = Input(Bool())
@@ -34,5 +37,8 @@ class ultra_vram extends BlackBox {
         val addrb = Input(UInt(VRAM_ADDRB_WIDTH.W))
         val dinb  = Input(UInt(8.W))
         // val doutb = Output(UInt(8.W))
+
+        val wr_reset_busy = Output(Bool())
+        val rd_reset_busy = Output(Bool())
     })
 }

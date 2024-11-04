@@ -20,7 +20,7 @@ class MipDataFetcher extends Module {
         val m_axis_mm2s_cmd = new datamover_m_axis_mm2s_cmd()
         val s_axis_mm2s     = new datamover_s_axis_mm2s()
 
-        val mip_channels = Vec(N_MIP_CHANNELS, Flipped(new calcChannelIn()))
+        val mip_channels = Vec(N_MIP_CHANNELS, Flipped(new calcInput()))
     })
 
     /* Control FSM */

@@ -12,17 +12,18 @@ import mip.MipConfigs.RES_CACHE_WR_DEPTH
 
 class proc_queue_fifo extends BlackBox {
     val io = IO(new Bundle {
-        val clk           = Input(Clock())
-        val rst           = Input(Bool())
-        val wr_en         = Input(Bool())
-        val wr_data       = Input(UInt(PROC_QUEUE_WR_WIDTH.W))
-        val rd_en         = Input(Bool())
-        val rd_data       = Output(UInt(PROC_QUEUE_RD_WIDTH.W))
+        val clk  = Input(Clock())
+        val srst = Input(Bool())
+
+        val wr_en = Input(Bool())
+        val din   = Input(UInt(PROC_QUEUE_WR_WIDTH.W))
+        val full  = Output(Bool())
+        val rd_en = Input(Bool())
+        val dout  = Output(UInt(PROC_QUEUE_RD_WIDTH.W))
+        val empty = Output(Bool())
+
         val rd_data_count = Output(UInt(log2Ceil(PROC_QUEUE_RD_DEPTH).W))
         val valid         = Output(Bool())
-        val full          = Output(Bool())
-        val empty         = Output(Bool())
-        val almost_empty  = Output(Bool())
     })
 }
 
@@ -48,17 +49,18 @@ class mip_dispatch_fifo extends BlackBox {
   */
 class result_cache_fifo extends BlackBox {
     val io = IO(new Bundle {
-        val clk           = Input(Clock())
-        val rst           = Input(Bool())
+        val clk = Input(Clock())
+        val srst = Input(Bool())
+
         val wr_en         = Input(Bool())
-        val wr_data       = Input(UInt((32 * N_MIP_CORES).W)) // might be 128
-        val wr_data_count = Output(UInt(log2Ceil(RES_CACHE_WR_DEPTH).W))
+        val din           = Input(UInt((32 * N_MIP_CORES).W)) // might be 128
+        val full          = Output(Bool())
         val rd_en         = Input(Bool())
         val rd_data       = Output(UInt(32.W))
-        val valid         = Output(Bool())
-        val full          = Output(Bool())
         val empty         = Output(Bool())
+        val wr_data_count = Output(UInt(log2Ceil(RES_CACHE_WR_DEPTH).W))
+        // val valid         = Output(Bool())
         // val almost_empty = Output(Bool())
-        val almost_full = Output(Bool())
+        // val almost_full = Output(Bool())
     })
 }
