@@ -3,6 +3,7 @@ package mip.xilinx
 import chisel3._
 import chisel3.util._
 import mip.MipConfigs._
+import dataclass.data
 
 /* AXI Datamover MM2S (Memory READ --> DATAMOVER) */
 
@@ -40,9 +41,19 @@ class datamover_m_axis_s2mm extends Bundle {
 
 // BRAM PORT
 class brama_gen_port(data_width: Int) extends Bundle {
-    val addra = Input(UInt(32.W))
-    val dina  = Input(UInt(32.W))
-    val douta = Output(UInt(32.W))
+    val addra = Input(UInt(data_width.W))
+    val dina  = Input(UInt(data_width.W))
+    val douta = Output(UInt(data_width.W))
     val ena   = Input(Bool())
     val wea   = Input(Bool())
+}
+
+class xlnx_axi_bram_ctrl_port(BRAM_ADDR_WIDTH: Int, DATA_WIDTH: Int) extends Bundle {
+    val bram_addr_a   = Output(UInt(BRAM_ADDR_WIDTH.W))
+    val bram_clk_a    = Output(Clock())
+    val bram_wrdata_a = Output(UInt(DATA_WIDTH.W))
+    val bram_rddata_a = Input(UInt(DATA_WIDTH.W))
+    val bram_en_a     = Output(Bool())
+    val bram_we_a     = Output(UInt((DATA_WIDTH / 8).W))
+    val bram_rst_a    = Output(Bool())
 }
