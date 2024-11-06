@@ -22,6 +22,7 @@ object FloatPoint {
 }
 class Fixed2Float extends BlackBox {
     val io = IO(new Bundle {
+        val aclk                 = Input(Clock())
         val s_axis_a_tvalid      = Input(Bool())
         val s_axis_a_tdata       = Input(SInt(INTERMEDIATE_WIDTH.W))
         val m_axis_result_tvalid = Output(Bool())
@@ -30,9 +31,10 @@ class Fixed2Float extends BlackBox {
 }
 
 object Fixed2Float {
-    def apply(a: SInt): FloatPoint = {
+    def apply(a: SInt, clk: Clock): FloatPoint = {
         val result = Wire(new FloatPoint())
         val f2f    = Module(new Fixed2Float())
+        f2f.io.aclk            := clk
         f2f.io.s_axis_a_tvalid := true.B
         f2f.io.s_axis_a_tdata  := a
         result.sign            := f2f.io.m_axis_result_tdata(15)
@@ -128,6 +130,7 @@ object FloatDiv {
 
 class FloatCmp extends BlackBox {
     val io = IO(new Bundle {
+        val aclk                 = Input(Clock())
         val s_axis_a_tdata       = Input(SInt(16.W))
         val s_axis_a_tvalid      = Input(Bool())
         val s_axis_b_tdata       = Input(SInt(16.W))
@@ -138,9 +141,10 @@ class FloatCmp extends BlackBox {
 }
 
 object FloatCmp {
-    def apply(a: FloatPoint, b: FloatPoint): Bool = {
+    def apply(a: FloatPoint, b: FloatPoint, clk: Clock): Bool = {
         val result = Wire(Bool())
         val fc     = Module(new FloatCmp())
+        fc.io.aclk            := clk
         fc.io.s_axis_a_tdata  := Cat(a.sign, a.int, a.sig).asSInt
         fc.io.s_axis_a_tvalid := true.B
         fc.io.s_axis_b_tdata  := Cat(b.sign, b.int, b.sig).asSInt
@@ -151,6 +155,7 @@ object FloatCmp {
 
 class FloatRnd extends BlackBox {
     val io = IO(new Bundle {
+        val aclk                 = Input(Clock())
         val s_axis_a_tdata       = Input(SInt(16.W))
         val s_axis_a_tvalid      = Input(Bool())
         val m_axis_result_tdata  = Output(UInt(16.W))
@@ -159,9 +164,10 @@ class FloatRnd extends BlackBox {
 }
 
 object FloatRnd {
-    def apply(a: FloatPoint): UInt = {
+    def apply(a: FloatPoint, clk: Clock): UInt = {
         val result = Wire(UInt(10.W))
         val fr     = Module(new FloatRnd())
+        fr.io.aclk            := clk
         fr.io.s_axis_a_tdata  := Cat(a.sign, a.int, a.sig).asSInt
         fr.io.s_axis_a_tvalid := true.B
         result                := fr.io.m_axis_result_tdata

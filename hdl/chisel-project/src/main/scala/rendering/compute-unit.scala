@@ -69,9 +69,9 @@ class WorldCoordStage(val gridResolution: Int, val gridSize: Int) extends Module
     val out_reg = RegInit(0.U.asTypeOf(new StageIO()))
     out_reg.valid    := io.in.valid
     out_reg.density  := io.in.density
-    out_reg.data(0)  := Fixed2Float(world_coord_tmp(0)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
-    out_reg.data(1)  := Fixed2Float(world_coord_tmp(1)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
-    out_reg.data(2)  := Fixed2Float(world_coord_tmp(2)(INTERMEDIATE_WIDTH - 1, 0).asSInt)
+    out_reg.data(0)  := Fixed2Float(world_coord_tmp(0)(INTERMEDIATE_WIDTH - 1, 0).asSInt, clock)
+    out_reg.data(1)  := Fixed2Float(world_coord_tmp(1)(INTERMEDIATE_WIDTH - 1, 0).asSInt, clock)
+    out_reg.data(2)  := Fixed2Float(world_coord_tmp(2)(INTERMEDIATE_WIDTH - 1, 0).asSInt, clock)
 
     io.out := out_reg
 }
@@ -137,8 +137,8 @@ class PerspectiveDivisionStage(val gridResolution: Int, val gridSize: Int) exten
     val screen_pos_x = FloatMul(x_div_z_plus_1, FloatPoint(0.B, "b11000".U, "b100000000".U), clock)
     val screen_pos_y = FloatMul(y_div_z_plus_1, FloatPoint(0.B, "b10111".U, "b1110000000".U), clock)
 
-    val screen_idx_x = FloatRnd(screen_pos_x)
-    val screen_idx_y = FloatRnd(screen_pos_y)
+    val screen_idx_x = FloatRnd(screen_pos_x, clock)
+    val screen_idx_y = FloatRnd(screen_pos_y, clock)
     val cmp00 = !screen_pos_x.sign
     val cmp01 = screen_idx_x < SCREEN_H.U
     val cmp10 = !screen_pos_y.sign
