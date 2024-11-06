@@ -23,6 +23,14 @@ class datamover_s_axis_mm2s extends Bundle {
     val tready = Output(Bool())
 }
 
+class datamover_s_axis_mm2s_sts extends Bundle {
+    val tdata  = Input(UInt(8.W))
+    val tvalid = Input(Bool())
+    val tready = Output(Bool())
+    val tkeep  = Input(UInt(1.W))
+    val tlast  = Input(Bool())
+}
+
 /* S2MM (AXIS DataMover ==> Memory Map) */
 
 // AXI4S command channel
@@ -45,7 +53,8 @@ class brama_gen_port(data_width: Int) extends Bundle {
     val dina  = Input(UInt(data_width.W))
     val douta = Output(UInt(data_width.W))
     val ena   = Input(Bool())
-    val wea   = Input(Bool())
+    // val wea   = Input(Bool())
+    val wea = Input(UInt((data_width / 8).W))
 }
 
 class xlnx_axi_bram_ctrl_port(BRAM_ADDR_WIDTH: Int, DATA_WIDTH: Int) extends Bundle {

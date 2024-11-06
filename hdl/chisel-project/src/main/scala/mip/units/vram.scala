@@ -68,16 +68,16 @@ class MipVramChannel extends Module {
         val read_channel = new RamPort() // read command from PS --- AXI BRAM CTRL
     })
 
-    val vram = Module(new ultra_vram())
+    // val vram = Module(new ultra_vram())
+    val uram_ctrl = Module(new Uram64Ctrl())
 
-    vram.io.clk                    := clock
-    vram.io.rst                    := reset.asBool || io.read_channel.ram_reset
-    io.read_channel.ram_reset_busy := vram.io.wr_reset_busy || vram.io.rd_reset_busy
+    uram_ctrl.io.external_reset    := reset.asBool || io.read_channel.ram_reset
+    io.read_channel.ram_reset_busy := false.B
 
     // ABOUT: MIP VRAM operation pipeline
-    // | RESP/DF/DEC | READ COMMAND | READ DATA - CMP - WRITE CMD
-    // |             |  ADDR CALC   |  READ CMD DELAYED
-    // |             |  NOP?        |  NOP?
+    // | RESP/DF/DEC | READ COMMAND | #1 | #2 | READ DATA - CMP - WRITE CMD
+    // |             |  ADDR CALC   | #1 | #2 |  READ CMD DELAYED
+    // |             |  NOP?        | #1 | #2 |  NOP?
 
     // Response, fetch & decode
     // needs first-word-fall-through fifo for low latency cache
@@ -121,30 +121,71 @@ class MipVramChannel extends Module {
     stall         := addr_conflict && need && rd_cmd_reg.valid
 
     val vram_rden = rd_cmd_reg.valid || io.read_channel.rden
-    vram.io.addra := Mux(io.read_channel.rden, io.read_channel.addr, rd_cmd_reg.rd_addr)
+    uram_ctrl.io.rd_addr := Mux(io.read_channel.rden, io.read_channel.addr, rd_cmd_reg.rd_addr)
 
     // read delay & data & compare & write
-    val rd_cmd_delay = RegNext(rd_cmd_reg)
-    val prev_density = vram.io.douta
+    // due to the restriction of URAM, read delay should be no less than 3 cycles
+    // also vram read port gives 64bits, which we only need 8bits. Wrap the address and select the important part.
+    val rd_cmd_delay = RegNext(RegNext(RegNext(rd_cmd_reg)))
+    val prev_density = uram_ctrl.io.rddata
 
     val wben   = Mux(io.en_minip, prev_density > rd_cmd_delay.density, prev_density < rd_cmd_delay.density)
     val wbaddr = rd_cmd_delay.rd_addr
 
-    vram.io.web   := wben && rd_cmd_delay.valid
-    vram.io.addrb := wbaddr
-    vram.io.dinb  := rd_cmd_delay.density
-
-    // others
-    io.read_channel.dout := vram.io.douta
+    uram_ctrl.io.wr_addr := wbaddr
+    uram_ctrl.io.wren    := wben && rd_cmd_delay.valid
+    uram_ctrl.io.wrdata  := rd_cmd_delay.density
 
     // read
-    vram.io.ena          := vram_rden || io.read_channel.rden
-    vram.io.addra        := Mux(io.read_channel.rden, io.read_channel.addr, rd_cmd_reg.rd_addr)
-    io.read_channel.dout := vram.io.douta
+    uram_ctrl.io.rden    := vram_rden || io.read_channel.rden
+    io.read_channel.dout := uram_ctrl.io.rddata
 }
+
+/** @brief
+  *   URAM64 byte w/r control
+  *
+  * @write
+  *   8bit data and byte-address.
+  * @read
+  *   8bit data and byte-address. latency=3
+  */
+class Uram64Ctrl extends Module {
+    val io = IO(new Bundle {
+        val external_reset = Input(Bool())
+
+        val rd_addr = Input(UInt(VRAM_ADDRA_WIDTH.W))
+        val rden    = Input(Bool())
+        val rddata  = Output(UInt(8.W))
+
+        val wr_addr = Input(UInt(VRAM_ADDRB_WIDTH.W))
+        val wren    = Input(Bool())
+        val wrdata  = Input(UInt(8.W))
+    })
+    val uram = Module(new ultra_vram())
+
+    uram.io.clk := clock
+    uram.io.rst := reset.asBool || io.external_reset
+
+    // read
+    uram.io.addra := io.rd_addr >> 3 // 64/8 = 8
+    uram.io.ena   := io.rden
+    // 3 clk latency
+    val byte_offset = RegNext(RegNext(RegNext(io.rd_addr(2, 0))))
+    io.rddata := (uram.io.douta >> (byte_offset * 8.U))(7, 0)
+
+    // write
+    uram.io.addrb := io.wr_addr >> 3
+    uram.io.enb   := io.wren
+    uram.io.dinb  := io.wrdata
+    uram.io.web := VecInit((0 until 8).map { i =>
+        val mask = (io.wr_addr(2, 0) === i.U)
+        mask && io.wren
+    }).asUInt
+}
+
 object Vram extends App {
     ChiselStage.emitSystemVerilogFile(
-        new MipVram(),
+        new Uram64Ctrl(),
         firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info"),
         args = Array("--target-dir", "build")
     )

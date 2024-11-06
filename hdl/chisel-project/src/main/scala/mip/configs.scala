@@ -3,6 +3,8 @@ package mip
 import rendering.CoreParams.CORENUMS
 
 object MipConfigs {
+    val DispatchFifoWrDepth = 1024
+    val DispatchFifoRdDepth = 512
     // PROC QUEUE CONFIGS
     // data fetcher -> mip core processing queue fifo configs
     // write: 128bits wide, depth = 512 => 2*32K blockRAMs,
@@ -10,8 +12,8 @@ object MipConfigs {
     val PROC_QUEUE_WR_WIDTH = 256 // 16 Bytes
     val WORKSET_WR_CNT      = 128 // 512 write depth. smaller to decrease latency
     // val PROC_QUEUE_WR_CNT   = WORKSET_SIZE / PROC_QUEUE_WR_WIDTH
-    val PROC_QUEUE_RD_WIDTH = CORENUMS * 8
-    val PROC_QUEUE_RD_DEPTH = 2048
+    val PROC_QUEUE_RD_WIDTH = CORENUMS * 8 // 32
+    val PROC_QUEUE_RD_DEPTH = 4096
     val WORKSET_RD_CNT      = WORKSET_WR_CNT * (PROC_QUEUE_WR_WIDTH / PROC_QUEUE_RD_WIDTH)
 
     val RES_CACHE_WR_DEPTH = 512 // 512 write depth. smaller to decrease latency

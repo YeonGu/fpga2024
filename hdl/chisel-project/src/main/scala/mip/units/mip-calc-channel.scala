@@ -49,8 +49,12 @@ class MipCalcChannel extends Module {
     val in  = IO(new calcInput())
     val out = IO(new calcResult())
     val mipCtrl = IO(new Bundle {
+        val startCmd  = Input(Bool())
         val mvpInfo   = Input(new Mat3x4())
         val baseCoord = Input(Vec(3, SInt(BASE_POS_XLEN.W)))
+
+        val calcCount  = Output(UInt(32.W))
+        val queueEmpty = Output(Bool())
     })
 
     // PROCESS QUEUE & VOXEL ADDR REG
@@ -72,6 +76,8 @@ class MipCalcChannel extends Module {
 
     result_queue.io.clk  := clock
     result_queue.io.srst := reset
+
+    mipCtrl.queueEmpty := result_queue.io.empty && proc_queue.io.empty
 
     // FSM
     object states extends ChiselEnum { val IDLE, LOAD, CALC = Value }
@@ -108,7 +114,7 @@ class MipCalcChannel extends Module {
     proc_queue.io.din   := in.proc_queue_wrdata
 
     /* proc_queue ==> calc core */
-    val toomuch_res = result_queue.io.wr_data_count >= (RES_CACHE_WR_DEPTH / 4 * 3).U
+    val toomuch_res = result_queue.io.wr_data_count >= 480.U // TODO: this thres
     proc_queue.io.rd_en := (channel_state === states.CALC) && (!toomuch_res)
 
     render_core.io.in.valid     := proc_queue.io.valid
@@ -116,20 +122,22 @@ class MipCalcChannel extends Module {
     render_core.io.in.voxelPos  := voxel_addr
     render_core.io.in.mvpInfo   := mipCtrl.mvpInfo
     render_core.io.in.baseCoord := mipCtrl.baseCoord
-    // TODO: check density assignment in compiled verilog
-    // render_core.io.in.density.zipWithIndex.foreach { case (d, idx) =>
-    //     d := proc_queue.io.rd_data(8 * (idx + 1) - 1, 8 * idx)
-    // }
+    // proc count
+    val proc_count = RegInit(0.U(32.W))
+    when(mipCtrl.startCmd) { proc_count := 0.U }
+        .elsewhen(channel_state === states.CALC) {
+            proc_count := Mux(proc_queue.io.valid, proc_count + 1.U, proc_count)
+        }
+    mipCtrl.calcCount := proc_count
 
     // RENDER CORE -> RES QUEUE
-
     /* mip_core ==> result_queue */
     val render_result = render_core.io.out // valid and packed results
     result_queue.io.wr_en := render_result.valid
     result_queue.io.din   := render_result.packedResult
 
     // Result queue => calc result (-> VRAM)
-    val res_fw_dec = result_queue.io.rd_data.asTypeOf(new MipOutputData())
+    val res_fw_dec = result_queue.io.dout.asTypeOf(new MipOutputData())
 
     result_queue.io.rd_en := out.rden || ~(res_fw_dec.valid)
     out.data_valid        := (!result_queue.io.empty) && res_fw_dec.valid

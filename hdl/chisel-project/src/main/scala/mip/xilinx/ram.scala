@@ -6,8 +6,9 @@ import mip.xilinx.VramConfigs.{VRAM_ADDRA_WIDTH => VRAM_ADDRA_WIDTH}
 import mip.xilinx.VramConfigs.{VRAM_ADDRB_WIDTH => VRAM_ADDRB_WIDTH}
 
 object VramConfigs {
-    val VRAM_ADDRA_WIDTH = log2Ceil(32 * 1024 * 3)
-    val VRAM_ADDRB_WIDTH = log2Ceil(32 * 1024 * 3)
+    // divide by 8. a word is 64bit wide.
+    val VRAM_ADDRA_WIDTH = log2Ceil(32 * 1024 * 3 / 8)
+    val VRAM_ADDRB_WIDTH = log2Ceil(32 * 1024 * 3 / 8)
 }
 
 /** Build VRAM in Dual Port Mode.
@@ -29,12 +30,12 @@ class ultra_vram extends BlackBox {
         // val wea = Input(Bool())
         val addra = Input(UInt(VRAM_ADDRA_WIDTH.W))
         val ena   = Input(Bool())
-        val douta = Output(UInt(8.W))
+        val douta = Output(UInt(64.W))
         // val dina  = Input(UInt(8.W))
 
-        // val enb   = Input(Bool())
-        val web   = Input(Bool())
         val addrb = Input(UInt(VRAM_ADDRB_WIDTH.W))
+        val enb   = Input(Bool())
+        val web   = Input(UInt(8.W))
         val dinb  = Input(UInt(8.W))
         // val doutb = Output(UInt(8.W))
 
