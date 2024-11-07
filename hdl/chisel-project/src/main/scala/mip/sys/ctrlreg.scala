@@ -73,8 +73,9 @@ class CtrlReg extends Module {
             }
         }
     }
+    val bcr_delayed = RegNext(base_coord_regs)
     // Convert base coordinates to signed fixed-point format
-    io.base_coord := base_coord_regs.map(_.asTypeOf(SInt(BASE_POS_XLEN.W)))
+    io.base_coord := bcr_delayed.map(_.asTypeOf(SInt(BASE_POS_XLEN.W)))
 
     // Start Control register and write logic
     io.start := io.ctrlreg_port.addra === (0x40 / 4).U && wren && io.ctrlreg_port.dina =/= 0.U

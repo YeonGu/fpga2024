@@ -7,6 +7,7 @@ import mip.MipConfigs._
 import mip.xilinx._
 import mip.xilinx.VramConfigs._
 import __global__.Params._
+import __global__.ScreenPos
 
 class MipVram extends Module {
     val io = IO(new Bundle {
@@ -99,9 +100,10 @@ class MipVramChannel extends Module {
 
     // read command gen reg. screen_pos.x/y ==> addra; valid => valid;
     val rd_cmd = new Bundle {
-        val valid   = Bool()
-        val rd_addr = UInt(VRAM_ADDRA_WIDTH.W)
-        val density = UInt(DENS_DEPTH.W)
+        val valid      = Bool()
+        val rd_addr    = UInt(VRAM_ADDRA_WIDTH.W)
+        val density    = UInt(DENS_DEPTH.W)
+        val screen_pos = new ScreenPos()
     }
     val rd_cmd_reg = RegInit(0.U.asTypeOf(rd_cmd))
 
@@ -111,13 +113,14 @@ class MipVramChannel extends Module {
         rd_cmd_reg.rd_addr,
         (df_result.screen_pos.y * SCREEN_H.U + df_result.screen_pos.x) / VRAM_CHANNELS.U
     )
-    rd_cmd_reg.density := Mux(stall, rd_cmd_reg.density, df_result.density)
+    rd_cmd_reg.screen_pos := Mux(stall, rd_cmd_reg.screen_pos, df_result.screen_pos)
+    rd_cmd_reg.density    := Mux(stall, rd_cmd_reg.density, df_result.density)
 
     // PIPELINE CONFLICT RESOLVE
     // when RESP and READCMD address conflicts, RESP hold one cycle
-    val resp_addr  = (df_result.screen_pos.y * SCREEN_H.U + df_result.screen_pos.x) / VRAM_CHANNELS.U
+    // val resp_addr  = (df_result.screen_pos.y * SCREEN_H.U + df_result.screen_pos.x) / VRAM_CHANNELS.U
     val rdcmd_addr = rd_cmd_reg.rd_addr
-    addr_conflict := (resp_addr === rdcmd_addr)
+    addr_conflict := df_result.screen_pos === rd_cmd_reg.screen_pos
     stall         := addr_conflict && need && rd_cmd_reg.valid
 
     val vram_rden = rd_cmd_reg.valid || io.read_channel.rden
