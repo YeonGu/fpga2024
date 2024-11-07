@@ -69,7 +69,7 @@ class MipCalcChannel extends Module {
     proc_queue.io.srst := reset
 
     // RENDER CORE
-    val render_core = Module(new RenderCore(128, 64))
+    val render_core = Module(new RenderCore(512, 64))
 
     // RESULT QUEUE
     val result_queue = Module(new result_cache_fifo())

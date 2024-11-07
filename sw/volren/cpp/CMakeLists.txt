@@ -5,9 +5,11 @@ project(ct_volume_render)
 
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Add compiler flags
 add_compile_options(-Werror -Wall -O3 -mfma -mavx2 -flto -funroll-loops -fopt-info-vec -ffast-math)
