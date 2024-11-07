@@ -37,13 +37,32 @@ void Mem::render_start()
     volatile uint32_t* start_reg = REG(START);
     *start_reg                   = 0x01;
 }
-void Mem::write_mvp()
+void Mem::write_mvp(Eigen::Matrix4i &mvp)
 {
     volatile uint32_t* mvp_reg = REG(MVP);
     // TODO:
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            mvp_reg[i * 4 + j] = mvp(i, j);
+        }
+    }
+    
 }
 void Mem::write_basecoord()
 {
     volatile uint32_t* basecoord_reg = REG(BASE_COORD);
     // TODO:
+    basecoord_reg[0] = -32;
+    basecoord_reg[1] = -32;
+    basecoord_reg[2] = -32;
+}
+
+void Mem::load_texture(const char *pathname) {
+    FILE *fp = fopen(pathname, "rb");
+    if (!fp) {
+        printf("Error: cannot open texture file\n");
+        exit(1);
+    }
+    fread(texture_ram_vptr, 8, 512 * 512 * 512, fp);
+    fclose(fp);
 }
