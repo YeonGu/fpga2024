@@ -67,7 +67,7 @@ class WorldCoordStage(val gridResolution: Int, val gridSize: Int) extends Module
     }
 
     val out_reg = RegInit(0.U.asTypeOf(new StageIO()))
-    out_reg.valid    := io.in.valid
+    out_reg.valid    := RegNext(io.in.valid)
     out_reg.density  := io.in.density
     out_reg.data(0)  := Fixed2Float(world_coord_tmp(0)(INTERMEDIATE_WIDTH - 1, 0).asSInt, clock)
     out_reg.data(1)  := Fixed2Float(world_coord_tmp(1)(INTERMEDIATE_WIDTH - 1, 0).asSInt, clock)
@@ -83,8 +83,8 @@ class MVPTransformStage(val gridResolution: Int, val gridSize: Int) extends Modu
         val out     = Output(new StageIO())
     })
 
-    val valid = ShiftRegister(io.in.valid, 4)
-    val density = ShiftRegister(io.in.density, 4)
+    val valid = ShiftRegister(io.in.valid, 5)
+    val density = ShiftRegister(io.in.density, 5)
     val world_coord = Wire(Vec(3, new FloatPoint))
     for (i <- 0 until 3) {
         world_coord(i) := io.in.data(i)
@@ -95,8 +95,11 @@ class MVPTransformStage(val gridResolution: Int, val gridSize: Int) extends Modu
         val val00 = FloatMul(world_coord(0), io.mvpInfo.mat(i)(0), clock)
         val val01 = FloatMul(world_coord(1), io.mvpInfo.mat(i)(1), clock)
         val val02 = FloatMul(world_coord(2), io.mvpInfo.mat(i)(2), clock)
-        val acc01 = FloatAdd(val00, val01, clock)
-        val acc02 = FloatAdd(val02, io.mvpInfo.mat(i)(3), clock)
+        val val00_reg = RegNext(val00)
+        val val01_reg = RegNext(val01)
+        val val02_reg = RegNext(val02)
+        val acc01 = FloatAdd(val00_reg, val01_reg, clock)
+        val acc02 = FloatAdd(val02_reg, io.mvpInfo.mat(i)(3), clock)
         val acc  = FloatAdd(acc01, acc02, clock)
         transfromed_coord(i) := acc
     }
@@ -115,27 +118,29 @@ class PerspectiveDivisionStage(val gridResolution: Int, val gridSize: Int) exten
         val out = Output(new MipOutputData())
     })
 
-    val valid = ShiftRegister(io.in.valid, 13)
-    val density = ShiftRegister(io.in.density, 13)
+    val valid = ShiftRegister(io.in.valid, 10)
+    val density = ShiftRegister(io.in.density, 10)
     // pre-defined constants
-    val focal = FloatPoint(0.B, "b1111".U, "b100000000".U)
-    val focal_aspect = FloatPoint(0.B, "b1111".U, "b1010101010".U)
+    // val focal = FloatPoint(0.B, "b10000".U, "b100000000".U)
+    // val focal_aspect = FloatPoint(0.B, "b10000".U, "b1010101010".U)
 
     val world_coord_x = io.in.data(0)
     val world_coord_y = io.in.data(1)
     val world_coord_z = io.in.data(2)
     val half_screen   = (1.S << (FRAC_INTERMEDIATE_WIDTH - 1))
-    val coord_x_focal = FloatMul(world_coord_x, focal, clock)
-    val coord_y_focal = FloatMul(world_coord_y, focal_aspect, clock)
+    // val coord_x_focal = FloatMul(world_coord_x, focal, clock)
+    // val coord_y_focal = FloatMul(world_coord_y, focal_aspect, clock)
 
-    val x_div_z = FloatDiv(coord_x_focal, world_coord_z, clock)
-    val y_div_z = FloatDiv(coord_y_focal, world_coord_z, clock)
+    val world_coord_x_plus1 = FloatAdd(world_coord_x, FloatPoint(0.B, "b1111".U, 0.U), clock)
+    val world_coord_y_plus1 = FloatAdd(world_coord_y, FloatPoint(0.B, "b1111".U, 0.U), clock)
 
-    val x_div_z_plus_1 = FloatAdd(x_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
-    val y_div_z_plus_1 = FloatAdd(y_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
+    // val x_div_z_plus_1 = FloatAdd(x_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
+    // val y_div_z_plus_1 = FloatAdd(y_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
+    val screen_coord_x = FloatDiv(world_coord_x_plus1, FloatPoint(0.B, "b10000".U, 0.U), clock)
+    val screen_coord_y = FloatDiv(world_coord_y_plus1, FloatPoint(0.B, "b10000".U, 0.U), clock)
 
-    val screen_pos_x = FloatMul(x_div_z_plus_1, FloatPoint(0.B, "b11000".U, "b100000000".U), clock)
-    val screen_pos_y = FloatMul(y_div_z_plus_1, FloatPoint(0.B, "b10111".U, "b1110000000".U), clock)
+    val screen_pos_x = FloatMul(screen_coord_x, FloatPoint(0.B, "b11000".U, "b1110000000".U), clock)
+    val screen_pos_y = FloatMul(screen_coord_y, FloatPoint(0.B, "b11000".U, "b0110100000".U), clock)
 
     val screen_idx_x = FloatRnd(screen_pos_x, clock)
     val screen_idx_y = FloatRnd(screen_pos_y, clock)
@@ -172,3 +177,6 @@ class ComputeUnit(val gridResolution: Int, val gridSize: Int) extends Module {
     io.out := perspective_division_stage.io.out
 }
 
+object CU extends App {
+    ChiselStage.emitSystemVerilogFile(new ComputeUnit(512, 64), Array("--target-dir", "generated"))
+}

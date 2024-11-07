@@ -76,7 +76,7 @@ class RenderCore(val gridResolution: Int, val gridSize: Int) extends Module {
     }.reduce(Cat(_, _)).asUInt
 
     // val resultReg = RegNext(Cat(result))
-    io.out.valid        := allValid
+    io.out.valid        := RegNext(allValid)
     io.out.packedResult := RegNext(packedResult)
 }
 
