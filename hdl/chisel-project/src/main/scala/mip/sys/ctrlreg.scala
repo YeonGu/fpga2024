@@ -62,7 +62,7 @@ class CtrlReg extends Module {
     }
     // Convert MVP registers to Mat3x4 type
     // io.mvp_info := mvp_info_regs.asTypeOf(new Mat3x4())
-    io.mvp_info := VecInit(mvp_info_regs.map(_.asTypeOf(UInt(16.W)))).asTypeOf(new Mat3x4())
+    io.mvp_info := RegNext(VecInit(mvp_info_regs.map(_.asTypeOf(UInt(16.W)))).asTypeOf(new Mat3x4()))
 
     // Base Coordinates registers and write logic
     val base_coord_regs = Reg(Vec(3, UInt(32.W)))

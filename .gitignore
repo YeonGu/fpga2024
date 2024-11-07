@@ -4,9 +4,9 @@
 *.bkp
 *.dtmp
 downloads/*
-proj/*
 compile_commands.json
 docs/repo/raster.png
 *.mp4
 *.zip
 settings.json
+sw/volren/volume.raw
