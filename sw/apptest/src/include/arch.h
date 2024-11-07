@@ -13,16 +13,23 @@
 #define CALC_CNT_OFF 0x50
 #define DISPATCH_CNT_OFF 0x60
 
+#define REG(x) (ctrlreg_vptr + x##_##OFF / sizeof(uint32_t))
+#define TEXTURE_RAM_SIZE (512 * 512 * 512)
+
 class Mem {
 private:
     int       fd;
     uint32_t* ctrlreg_vptr;
+    uint8_t*  texture_ram_vptr; // mapped to 0x0000_0000 in DDR
 
 public:
     Mem();
     ~Mem();
 
     uint8_t* get_vram_vptr();
+
+public:
+    // TODO: texture ram load
 
 public:
     // control register io
