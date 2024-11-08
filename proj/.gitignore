@@ -1,3 +1,4 @@
 hw_medical_proj/*
 devicetree/*
 !devicetree/system-top.dts
+!devicetree/*.dtsi

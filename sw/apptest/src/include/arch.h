@@ -1,6 +1,7 @@
 #ifndef __ARCH_H__
 #define __ARCH_H__
 
+#include <Eigen/Dense>
 #include <cstdint>
 #include <cstdio>
 
@@ -34,7 +35,7 @@ public:
 public:
     // control register io
     void render_start();
-    void write_mvp();
+    void write_mvp(Eigen::Matrix4i& mvp);
     void write_basecoord();
 
 public:
@@ -42,7 +43,7 @@ public:
     uint32_t get_render_cnt(int id);
 
 public:
-    void load_texture();
+    void load_texture(const char* pathname);
 };
 
 #endif

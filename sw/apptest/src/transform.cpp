@@ -1,7 +1,13 @@
 #include <eigen3/Eigen/Dense>
 #include <info.h>
 
-inline Eigen::Matrix4f gen_mvp_matrix(const camera_transform_t& transform)
+uint32_t float2fixed(float f)
+{
+    float scaled = std::round(f * 64.f);
+    return static_cast<uint32_t>(scaled) & 0xFFFF0000;
+}
+
+inline Eigen::Matrix4i gen_mvp_matrix(const camera_transform_t& transform)
 {
     // M = Mortho * Mview
     Eigen::Matrix4f Mview = Eigen::Matrix4f::Identity();
@@ -71,5 +77,12 @@ inline Eigen::Matrix4f gen_mvp_matrix(const camera_transform_t& transform)
     // clang-format on
     Eigen::Matrix4f Mortho = Sortho * Tortho;
 
-    return Mortho * Mview;
+    Eigen::Matrix4f tmp = Mortho * Mview;
+    Eigen::Matrix4i result;
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            result(i, j) = float2fixed(tmp(i, j));
+        }
+    }
+    return result;
 }

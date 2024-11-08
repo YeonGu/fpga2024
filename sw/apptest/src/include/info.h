@@ -1,7 +1,7 @@
 #ifndef __INFO_H__
 #define __INFO_H__
 
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 
 struct camera_transform_t
 {
@@ -13,4 +13,5 @@ struct camera_transform_t
     const float aspect_ratio = 960.0f / 720.0f;
 };
 
+Eigen::Matrix4i gen_mvp_matrix(const camera_transform_t& transform);
 #endif // __INFO_H__

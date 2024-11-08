@@ -174,3 +174,31 @@ object FloatRnd {
         result
     }
 }
+
+class FloatSub extends BlackBox {
+    val io = IO(new Bundle {
+        val aclk                 = Input(Clock())
+        val s_axis_a_tdata       = Input(SInt(16.W))
+        val s_axis_a_tvalid      = Input(Bool())
+        val s_axis_b_tdata       = Input(SInt(16.W))
+        val s_axis_b_tvalid      = Input(Bool())
+        val m_axis_result_tdata  = Output(SInt(16.W))
+        val m_axis_result_tvalid = Output(Bool())
+    })
+}
+
+object FloatSub {
+    def apply(a: FloatPoint, b: FloatPoint, clk: Clock): FloatPoint = {
+        val result = Wire(new FloatPoint())
+        val fs     = Module(new FloatSub())
+        fs.io.aclk            := clk
+        fs.io.s_axis_a_tdata  := Cat(a.sign, a.int, a.sig).asSInt
+        fs.io.s_axis_a_tvalid := true.B
+        fs.io.s_axis_b_tdata  := Cat(b.sign, b.int, b.sig).asSInt
+        fs.io.s_axis_b_tvalid := true.B
+        result.sign           := fs.io.m_axis_result_tdata(15)
+        result.int            := fs.io.m_axis_result_tdata(14, 10)
+        result.sig            := fs.io.m_axis_result_tdata(9, 0)
+        result
+    }
+}
