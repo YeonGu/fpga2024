@@ -132,7 +132,7 @@ class PerspectiveDivisionStage(val gridResolution: Int, val gridSize: Int) exten
     // val coord_y_focal = FloatMul(world_coord_y, focal_aspect, clock)
 
     val world_coord_x_plus1 = FloatAdd(world_coord_x, FloatPoint(0.B, "b1111".U, 0.U), clock)
-    val world_coord_y_plus1 = FloatAdd(world_coord_y, FloatPoint(0.B, "b1111".U, 0.U), clock)
+    val world_coord_y_plus1 = FloatSub(FloatPoint(0.B, "b1111".U, 0.U), world_coord_y, clock)
 
     // val x_div_z_plus_1 = FloatAdd(x_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
     // val y_div_z_plus_1 = FloatAdd(y_div_z, FloatPoint(0.B, "b1110".U, 0.U), clock)
