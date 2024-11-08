@@ -83,8 +83,8 @@ class MVPTransformStage(val gridResolution: Int, val gridSize: Int) extends Modu
         val out     = Output(new StageIO())
     })
 
-    val valid = ShiftRegister(io.in.valid, 5)
-    val density = ShiftRegister(io.in.density, 5)
+    val valid = ShiftRegister(io.in.valid, 7)
+    val density = ShiftRegister(io.in.density, 7)
     val world_coord = Wire(Vec(3, new FloatPoint))
     for (i <- 0 until 3) {
         world_coord(i) := io.in.data(i)
@@ -118,8 +118,8 @@ class PerspectiveDivisionStage(val gridResolution: Int, val gridSize: Int) exten
         val out = Output(new MipOutputData())
     })
 
-    val valid = ShiftRegister(io.in.valid, 10)
-    val density = ShiftRegister(io.in.density, 10)
+    val valid = ShiftRegister(io.in.valid, 12)
+    val density = ShiftRegister(io.in.density, 12)
     // pre-defined constants
     // val focal = FloatPoint(0.B, "b10000".U, "b100000000".U)
     // val focal_aspect = FloatPoint(0.B, "b10000".U, "b1010101010".U)
