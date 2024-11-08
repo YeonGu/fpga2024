@@ -40,7 +40,7 @@ class MipDataFetcher extends Module {
     val cmd_sender_state  = RegInit(CmdSendState.IDLE)
     val stream_recv_state = RegInit(StreamReceiverState.IDLE)
 
-    val TEXTURE_ADDR_BASE     = 0
+    val TEXTURE_ADDR_BASE     = "h3ef4_0000"
     val stream_cmd_start_addr = RegInit(TEXTURE_ADDR_BASE.U(32.W))
     val btt                   = WireInit(8192.U(23.W))
 

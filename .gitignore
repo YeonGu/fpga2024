@@ -10,3 +10,4 @@ docs/repo/raster.png
 *.zip
 settings.json
 sw/volren/volume.raw
+*.dtbo
