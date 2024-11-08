@@ -75,29 +75,3 @@
 		xlnx,single-port-bram = <0x1>;
 	};
 };
-
-/ {
-		@fragment0 {
-		target-path = "/reserved-memory";
-		__overlay__ {
-			#address-cells = <0x02>;
-			#size-cells = <0x02>;
-			ranges;
-
-			reserved: buffer@a0000000 {
-				no-map;
-				reg = <0x00 0x00000000 0x00 0x1000000>;
-			};
-		};
-	};
-
-	@fragment1 {
-		target-path = "/";
-		__overlay__ {
-			fpga_renderer@a0000000 {
-				compatible = "xlnx,reserved-memory";
-				memory-region = <&reserved>;
-			};
-		};
-	};
-};
