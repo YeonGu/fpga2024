@@ -44,7 +44,6 @@ void render_entry()
         float    opacity;
     };
 
-    // std::array<std::array<uint16_t, target_resolution.col>, target_resolution.row> render_image;
     static uint8_t render_image[target_resolution.row][target_resolution.col];
 
     /* ray tracing */
@@ -68,19 +67,13 @@ void render_entry()
                 trace_pos += eye_ray * RAYTRACE_STEP;
                 float opacity      = image_stack->sample_opacity_world(trace_pos);
                 float cam_distance = (trace_pos - cam_pos).norm();
-                // std::cout << "trace pos: \n" << trace_pos << std::endl;
-                // if(i == target_resolution.row / 2 && j == target_resolution.col / 2)
-                //     printf("trace pos: %f %f %f\n", trace_pos[0], trace_pos[1], trace_pos[2]);
+
                 if(opacity > 0.0f) {
                     samples.push_back(
                         {image_stack->sample_color_world(trace_pos, cam_distance), opacity});
-                    // std::cout << "sample color: " << samples.back().color
-                    //           << "\n sample opacity: " << samples.back().opacity << std::endl;
                 }
-                if(opacity > 0.95f) {
-                    // printf("terminated ray\n");
-                    break;
-                }
+                if(opacity > 0.95f)
+                    break; // terminate ray tracing
             }
 
             // composite samples
@@ -89,18 +82,9 @@ void render_entry()
             for(auto it = samples.rbegin(); it != samples.rend(); ++it) {
                 composite_color = composite_color * (1 - it->opacity) + it->color * it->opacity;
             }
-            // if(i == 27 && j == 30)
-            //     printf("composite_color: %d\n", composite_color);
-            // if(i == 28 && j == 30)
-            //     printf("composite_color: %d\n", composite_color);
             render_image[i][j] = composite_color;
         }
     }
-
-    // for(uint32_t i = 0; i < target_resolution.row; i++) {
-    //     printf("%d:%d  ", i, render_image[i][30]);
-    // }
-    // printf("\n%d %d\n", render_image[27][30], render_image[28][30]);
 
     // display render image
     cv::Mat img_mat(target_resolution.row, target_resolution.col, CV_8U, render_image);
@@ -109,5 +93,3 @@ void render_entry()
         // Press 'Esc' key to exit
     }
 }
-
-// std::shared_ptr<image_t> ray_tracing() { }

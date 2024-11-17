@@ -36,11 +36,11 @@ module vram_tb ();
   wire [7:0] io_calc_res_3_density;
 
   wire io_en_minip;
-  wire [31:0] io_ram_port_addra;
-  wire [31:0] io_ram_port_dina;
-  wire [31:0] io_ram_port_douta;
+  wire [63:0] io_ram_port_addra;
+  wire [63:0] io_ram_port_dina;
+  wire [63:0] io_ram_port_douta;
   wire io_ram_port_ena;
-  wire io_ram_port_wea;
+  wire [7:0] io_ram_port_wea;
 
   assign reset = counter <= 2;
 
@@ -101,14 +101,14 @@ module vram_tb ();
       .io_calc_res_3_screen_pos_x(io_calc_res_3_screen_pos_x),
       .io_calc_res_3_screen_pos_y(io_calc_res_3_screen_pos_y),
       .io_calc_res_3_density(io_calc_res_3_density),
-      .io_en_minip(io_en_minip),
+      // .io_en_minip(io_en_minip),
       .io_ram_port_addra(io_ram_port_addra),
-      .io_ram_port_dina(io_ram_port_dina),
+      // .io_ram_port_dina(io_ram_port_dina),
       .io_ram_port_douta(io_ram_port_douta),
       .io_ram_port_ena(io_ram_port_ena),
-      .io_ram_port_wea(io_ram_port_wea),
-      .io_ram_reset(reset),
-      .io_ram_reset_busy(busy)
+      // .io_ram_port_wea(io_ram_port_wea),
+      .io_ram_reset(reset)
+      // .io_ram_reset_busy(busy)
   );
 
 endmodule

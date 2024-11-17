@@ -9,7 +9,7 @@ import dataclass.data
 
 // AXI4S command channel
 class datamover_m_axis_mm2s_cmd extends Bundle {
-    val tdata  = Output(UInt(72.W))
+    val tdata  = Output(UInt(96.W))
     val tvalid = Output(Bool())
     val tready = Input(Bool())
 }

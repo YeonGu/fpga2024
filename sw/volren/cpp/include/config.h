@@ -7,16 +7,16 @@
 #define RAYTRACE_STEP 0.005f
 
 /* camera properties */
-#define CAM_FOV 40.0f
-#define CAM_POS_X -2.0f
-#define CAM_POS_Y 2.0f
+#define CAM_FOV 50.0f
+#define CAM_POS_X 2.0f
+#define CAM_POS_Y 0.0f
 #define CAM_POS_Z 2.0f
 
-#define CAM_PITCH -35.0f // up-down
-#define CAM_YAW 45.0f    // left-right
+#define CAM_PITCH 0.0f // up-down
+#define CAM_YAW -45.0f // left-right
 
-#define THRES_SKIN
-// #define THRES_BONE
+// #define THRES_SKIN
+#define THRES_BONE
 
 /* ray tracing */
 #define MAX_TRACE_DISTANCE 5

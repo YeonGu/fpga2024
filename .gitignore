@@ -11,3 +11,5 @@ docs/repo/raster.png
 settings.json
 sw/volren/volume.raw
 *.dtbo
+
+*.blend1

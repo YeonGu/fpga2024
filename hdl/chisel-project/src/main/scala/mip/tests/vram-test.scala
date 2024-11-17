@@ -64,6 +64,7 @@ class VramTestGen extends Module {
         val ram_port = Flipped(new brama_gen_port(64))
     })
     val calc_res_gen = Seq.fill(N_MIP_CHANNELS)(Module(new CalcGen()))
+    val cnt = RegInit(0.U(32.W))
 
     io.en_minip := false.B
     io.calc_res.zipWithIndex.foreach { case (res, i) => res <> calc_res_gen(i).io.res }
@@ -71,6 +72,14 @@ class VramTestGen extends Module {
     io.ram_port.wea   := false.B
     io.ram_port.addra := 0.U
     io.ram_port.dina  := 0.U
+
+    cnt := cnt + 1.U
+    io.ram_port.ena := cnt > 100.U
+    val addr = RegInit(0.U(64.W))
+    when(cnt > 100.U) {
+        addr := addr + 8.U
+    }
+    io.ram_port.addra := addr
 }
 
 class randgen extends BlackBox {

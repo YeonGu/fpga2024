@@ -63,35 +63,35 @@ if __name__ == "__main__":
         print("No images were loaded successfully")
         assert False, "No images loaded"
 
-    # max_value = 0
-    # max_idx = 0
-    # for i in range(image_stack.shape[0]):
-    #     max_value = max(max_value, np.max(image_stack[i]))
-    #     max_idx = i if np.max(image_stack[i]) == max_value else max_idx
-    # print(f"Max value in image_stack: {max_value, max_idx}")
+    max_value = 0
+    max_idx = 0
+    for i in range(image_stack.shape[0]):
+        max_value = max(max_value, np.max(image_stack[i]))
+        max_idx = i if np.max(image_stack[i]) == max_value else max_idx
+    print(f"Max value in image_stack: {max_value, max_idx}")
 
-    # plt.imshow(image_stack[35], cmap="gray")
-    # plt.title("Slice 100 of the 3D Image Stack")
-    # plt.show()
+    plt.imshow(image_stack[150], cmap="gray")
+    plt.title("Slice 100 of the 3D Image Stack")
+    plt.show()
 
     # return image_stack
-    sampled_image = np.zeros((512, 512, 512), dtype=np.uint8)
+    # sampled_image = np.zeros((512, 512, 512), dtype=np.uint8)
 
-    # Rescale the image stack to the desired shape
-    zoom_factors = (
-        512 / image_stack.shape[0],
-        512 / image_stack.shape[1],
-        512 / image_stack.shape[2],
-    )
-    sampled_image = zoom(image_stack, zoom_factors, order=1).astype(np.uint16)
-    sampled_image = sampled_image * (256.0 / 2800.0)
-    sampled_image = sampled_image.astype(np.uint8)
+    # # Rescale the image stack to the desired shape
+    # zoom_factors = (
+    #     512 / image_stack.shape[0],
+    #     512 / image_stack.shape[1],
+    #     512 / image_stack.shape[2],
+    # )
+    # sampled_image = zoom(image_stack, zoom_factors, order=1).astype(np.uint16)
+    # sampled_image = sampled_image * (256.0 / 2800.0)
+    # sampled_image = sampled_image.astype(np.uint8)
 
-    print(np.max(sampled_image))
+    # print(np.max(sampled_image))
 
-    # plt.imshow(sampled_image[30], cmap="gray")
-    # plt.title("Sampled Image")
-    # plt.show()
+    # # plt.imshow(sampled_image[30], cmap="gray")
+    # # plt.title("Sampled Image")
+    # # plt.show()
 
-    # Save the sampled image as a binary file
-    sampled_image.tofile("volume.raw")
+    # # Save the sampled image as a binary file
+    # sampled_image.tofile("volume.raw")

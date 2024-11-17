@@ -13,5 +13,5 @@ struct camera_transform_t
     const float aspect_ratio = 960.0f / 720.0f;
 };
 
-Eigen::Matrix4i gen_mvp_matrix(const camera_transform_t& transform);
+Eigen::Matrix4f gen_mvp_matrix(const camera_transform_t& transform);
 #endif // __INFO_H__

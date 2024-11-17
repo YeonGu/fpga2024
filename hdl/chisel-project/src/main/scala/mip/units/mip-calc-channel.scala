@@ -54,6 +54,7 @@ class MipCalcChannel extends Module {
         val baseCoord = Input(Vec(3, SInt(BASE_POS_XLEN.W)))
 
         val calcCount  = Output(UInt(32.W))
+        val validCnt   = Output(UInt(32.W))
         val queueEmpty = Output(Bool())
     })
 
@@ -135,6 +136,11 @@ class MipCalcChannel extends Module {
     val render_result = render_core.io.out // valid and packed results
     result_queue.io.wr_en := render_result.valid
     result_queue.io.din   := render_result.packedResult
+
+    val res_valid_cnt = RegInit(0.U(32.W))
+    when(render_result.valid) { res_valid_cnt := res_valid_cnt + 1.U }
+    when(mipCtrl.startCmd) { res_valid_cnt := 0.U }
+    mipCtrl.validCnt := res_valid_cnt
 
     // Result queue => calc result (-> VRAM)
     val res_fw_dec = result_queue.io.dout.asTypeOf(new MipOutputData())

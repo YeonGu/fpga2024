@@ -25,8 +25,7 @@ module ultra_vram #(
     input wire [VRAM_ADDRB_WIDTH-1:0] addrb,
     input wire                        enb,    // Added enable for port B read
     input wire [                 7:0] web,
-    input wire [                 7:0] dinb,
-    // output wire [                 8:0] doutb,  // Output on port B
+    input wire [                63:0] dinb,
 
     output wire wr_reset_busy,
     output wire rd_reset_busy
