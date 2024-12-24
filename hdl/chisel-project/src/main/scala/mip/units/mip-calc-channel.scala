@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 import __global__.GeneratedParams.SCREEN_ADDR_WIDTH
 import mip.MipConfigs._
+import rendering.RenderCoreWrapper
 // import xilinx.proc_queue
 import rendering.IntensityProjectionCore
 import __global__.Params.DENS_DEPTH
@@ -23,11 +24,8 @@ import _root_.circt.stage.ChiselStage
 class calcInput extends Bundle {
     val need_data = Output(Bool())
 
-    // val x_reg_wrdata    = Input(UInt(log2Ceil(SCREEN_H).W))
-    // val y_reg_wrdata    = Input(UInt(log2Ceil(SCREEN_V).W))
-    // val screen_pos_wren = Input(Bool())
     val voxel_addr_reg_wren   = Input(Bool())
-    val voxel_addr_reg_wrdata = Input(UInt(SCREEN_ADDR_WIDTH.W))
+    val voxel_addr_reg_wrdata = Input(UInt(VOXEL_POS_XLEN.W))
 
     val proc_queue_wren   = Input(Bool())
     val proc_queue_wrdata = Input(UInt(PROC_QUEUE_WR_WIDTH.W))
@@ -42,8 +40,7 @@ class calcResult extends Bundle {
 
 /** MIP calculation channel.
   *
-  * [Data Fetcher]-----------> densityQueue =======> mipCore =======> resultCache -----------> addrReg proc *
-  * 4
+  * [Data Fetcher] ---> densityQueue ===> mipCore ===> resultCache ---> addrReg proc * 4
   */
 class MipCalcChannel extends Module {
     val in  = IO(new calcInput())
@@ -70,7 +67,7 @@ class MipCalcChannel extends Module {
     proc_queue.io.srst := reset
 
     // RENDER CORE
-    val render_core = Module(new RenderCore(512, 64))
+    val render_core = Module(new RenderCoreWrapper())
 
     // RESULT QUEUE
     val result_queue = Module(new result_cache_fifo())
@@ -83,7 +80,6 @@ class MipCalcChannel extends Module {
     // FSM
     object states extends ChiselEnum { val IDLE, LOAD, CALC = Value }
     val channel_state = RegInit(states.IDLE)
-    // val IDLE::FETCH::CALC
 
     // Process addrReg and procCounter in this FSM logic
     // In order to avoid conflicts, calculation starts when a whole workset
@@ -96,7 +92,7 @@ class MipCalcChannel extends Module {
             when(~proc_queue.io.empty) { channel_state := states.LOAD }
         }
         is(states.LOAD) {
-            when(proc_queue.io.rd_data_count >= WORKSET_RD_CNT.U) { channel_state := states.CALC }
+            when(proc_queue.io.rd_data_count >= (WORKSET_RD_CNT - 1).U) { channel_state := states.CALC }
         }
         is(states.CALC) {
             // increse 1 if remains data in proc_queue
@@ -105,7 +101,6 @@ class MipCalcChannel extends Module {
             voxel_addr := Mux(proc_queue.io.valid, voxel_addr + CORENUMS.U, voxel_addr)
 
             channel_state := Mux(proc_queue.io.empty, states.IDLE, states.CALC)
-            // when(proc_count === (WORKSET_RD_CNT - 1).U) { channel_state := states.IDLE }
         }
     }
 

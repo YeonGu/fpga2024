@@ -22,6 +22,11 @@ class CtrlReg extends Module {
         val channels_cnt  = Input(Vec(N_MIP_CHANNELS, UInt(32.W))) // Channel counter input (4 channels)
         val last_finished = Input(Bool())                          // Last channel finished signal input
 
+        val dispatchFifoWrens    = Input(UInt(32.W))
+        val dispatchFifoWracks   = Input(UInt(32.W))
+        val dispatchFifoRdens    = Input(UInt(32.W))
+        val dispatchFifoRdvalids = Input(UInt(32.W))
+
         val cmd_send_cnt   = Input(UInt(32.W))
         val fetch_cnt      = Input(UInt(32.W))
         val cmd_send_state = Input(UInt(32.W))
@@ -111,12 +116,16 @@ class CtrlReg extends Module {
             32.U             -> io.cmd_send_state,
             33.U             -> io.stream_state,
             34.U             -> io.last_sts,
-            35.U             -> started.asUInt
+            35.U             -> started.asUInt,
+            80.U             -> io.dispatchFifoWrens,
+            81.U             -> io.dispatchFifoWracks,
+            82.U             -> io.dispatchFifoRdens,
+            83.U             -> io.dispatchFifoRdvalids
         ) ++
-            (0 until N_MIP_CHANNELS)
-                .map(i => ((0x50 / 4 + i).U -> io.channels_cnt(i))) ++ // Channel counters
             (0 until 12)
                 .map(i => (i.U -> mvp_info_regs(i))) ++ // MVP matrix registers
+            (0 until N_MIP_CHANNELS)
+                .map(i => ((0x50 / 4 + i).U -> io.channels_cnt(i))) ++ // Channel counters
             (0 until 3)
                 .map(i => ((0x30 / 4 + i).U -> base_coord_regs(i))) ++ // Base coordinate registers
 

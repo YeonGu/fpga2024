@@ -2,13 +2,7 @@ package mip.xilinx
 
 import chisel3._
 import chisel3.util._
-import mip.MipConfigs.PROC_QUEUE_WR_WIDTH
-import __global__.Params.DENS_DEPTH
-import mip.MipConfigs.N_MIP_CORES
-import mip.MipConfigs.MIP_AXIS_MM2S_WIDTH
-import mip.MipConfigs.PROC_QUEUE_RD_WIDTH
-import mip.MipConfigs.PROC_QUEUE_RD_DEPTH
-import mip.MipConfigs.RES_CACHE_WR_DEPTH
+import mip.MipConfigs._
 
 /** BlackBox wrapper for a Xilinx FIFO primitive implementing a processor queue.
   *
@@ -58,9 +52,10 @@ class mip_dispatch_fifo extends BlackBox {
         val empty = Output(Bool())
 
         val valid = Output(Bool())
+        val wr_ack = Output(Bool())
         // val data_count = Output(UInt(10.W))
-        val wr_data_count = Output(UInt(11.W))
-        val rd_data_count = Output(UInt(10.W))
+        val wr_data_count = Output(UInt(12.W))
+        val rd_data_count = Output(UInt(11.W))
 
         val wr_rst_busy = Output(Bool())
         val rd_rst_busy = Output(Bool())
@@ -82,6 +77,26 @@ class result_cache_fifo extends BlackBox {
         val dout          = Output(UInt(32.W))
         val empty         = Output(Bool())
         val wr_data_count = Output(UInt((log2Ceil(RES_CACHE_WR_DEPTH) + 1).W)) // 512 bits
+
+        val wr_rst_busy = Output(Bool())
+        val rd_rst_busy = Output(Bool())
+    })
+}
+
+class calc_test_fifo extends BlackBox {
+    val io = IO(new Bundle {
+        val clk  = Input(Clock())
+        val srst = Input(Bool())
+
+        val wr_en         = Input(Bool())
+        val din           = Input(UInt((32 * N_MIP_CORES).W))                  // might be 128
+        val full          = Output(Bool())
+        val rd_en         = Input(Bool())
+        val dout          = Output(UInt(32.W))
+        val empty         = Output(Bool())
+        val wr_data_count = Output(UInt((log2Ceil(RES_CACHE_WR_DEPTH) + 1).W)) // 512
+        val rd_data_count = Output(UInt((log2Ceil(RES_CACHE_RD_DEPTH) + 1).W)) // 2048
+        val valid         = Output(Bool())
 
         val wr_rst_busy = Output(Bool())
         val rd_rst_busy = Output(Bool())

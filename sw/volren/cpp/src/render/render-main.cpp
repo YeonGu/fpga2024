@@ -1,5 +1,6 @@
 #include "config.h"
 // #include <Eigen/Dense>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -29,14 +30,20 @@ Eigen::Vector4f raster2world(uint32_t raster_x, uint32_t raster_y,
 
 void render_entry()
 {
+    // initialize timer
+
     // load image stack
     auto image_stack = load_ct_image(1006, 250);
-    auto cam_mat     = camera_matrix();
+
+    auto start   = std::chrono::high_resolution_clock::now();
+    auto cam_mat = camera_matrix();
 
     std::cout << "cam_mat: " << cam_mat << std::endl;
 
     Eigen::Vector4f        cam_pos{CAM_POS_X, CAM_POS_Y, CAM_POS_Z, 1};
     constexpr resolution_t target_resolution = {512, 512};
+
+    auto mvp_end = std::chrono::high_resolution_clock::now();
 
     struct samples_t
     {
@@ -48,7 +55,7 @@ void render_entry()
 
     /* ray tracing */
     for(uint32_t i = 0; i < target_resolution.row; i++) {
-        printf("Rendering row %d\n", i);
+        // printf("Rendering row %d\n", i);
         for(uint32_t j = 0; j < target_resolution.col; j++) {
             auto            pix_world = raster2world(i, j, target_resolution, cam_mat);
             Eigen::Vector4f eye_ray   = pix_world - cam_pos;
@@ -57,12 +64,11 @@ void render_entry()
             // std::cout << "screen:" << i << j << "eye_ray: " << eye_ray << std::endl;
 
             // carry out ray tracing
-            uint32_t trace_times = MAX_TRACE_DISTANCE / RAYTRACE_STEP;
-            auto     trace_pos   = cam_pos;
+            uint32_t        trace_times = MAX_TRACE_DISTANCE / RAYTRACE_STEP;
+            Eigen::Vector4f trace_pos   = cam_pos;
 
             std::vector<samples_t> samples = {};
 
-            // TODO: use oct-tree to accelerate ray tracing
             while(trace_times--) {
                 trace_pos += eye_ray * RAYTRACE_STEP;
                 float opacity      = image_stack->sample_opacity_world(trace_pos);
@@ -79,12 +85,27 @@ void render_entry()
             // composite samples
             // see paper "Volume Rendering" by Marc Levoy for more details
             uint8_t composite_color = 0;
+            uint8_t cnt             = 0;
             for(auto it = samples.rbegin(); it != samples.rend(); ++it) {
+                // composite_color = composite_color * (1 - it->opacity) + it->color * it->opacity;
                 composite_color = composite_color * (1 - it->opacity) + it->color * it->opacity;
+                cnt++;
+                if(cnt > 16)
+                    break;
             }
             render_image[i][j] = composite_color;
         }
     }
+
+    auto render_end = std::chrono::high_resolution_clock::now();
+
+    auto mvp_duration
+        = std::chrono::duration_cast<std::chrono::milliseconds>(mvp_end - start).count();
+    auto render_duration
+        = std::chrono::duration_cast<std::chrono::milliseconds>(render_end - mvp_end).count();
+
+    std::cout << "MVP duration: " << mvp_duration << "ms" << std::endl;
+    std::cout << "Render duration: " << render_duration << "ms" << std::endl;
 
     // display render image
     cv::Mat img_mat(target_resolution.row, target_resolution.col, CV_8U, render_image);

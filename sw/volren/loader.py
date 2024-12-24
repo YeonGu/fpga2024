@@ -63,15 +63,19 @@ if __name__ == "__main__":
         print("No images were loaded successfully")
         assert False, "No images loaded"
 
-    max_value = 0
-    max_idx = 0
-    for i in range(image_stack.shape[0]):
-        max_value = max(max_value, np.max(image_stack[i]))
-        max_idx = i if np.max(image_stack[i]) == max_value else max_idx
-    print(f"Max value in image_stack: {max_value, max_idx}")
+    # max_value = 0
+    # max_idx = 0
+    # for i in range(image_stack.shape[0]):
+    #     max_value = max(max_value, np.max(image_stack[i]))
+    #     max_idx = i if np.max(image_stack[i]) == max_value else max_idx
+    # print(f"Max value in image_stack: {max_value, max_idx}")
 
-    plt.imshow(image_stack[150], cmap="gray")
+    plt.imshow(image_stack[100], cmap="gray")
     plt.title("Slice 100 of the 3D Image Stack")
+
+    plt.grid(True)
+    plt.xticks(np.arange(0, image_stack.shape[2], 32))
+    plt.yticks(np.arange(0, image_stack.shape[1], 32))
     plt.show()
 
     # return image_stack

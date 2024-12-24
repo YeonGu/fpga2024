@@ -1,13 +1,13 @@
 package __global__
 
+import __global__.Params._
 import chisel3._
 import chisel3.util.log2Up
-import __global__.Params._
-import rendering.FloatPoint
+import rendering.Float32
 
 class ScreenPos extends Bundle {
-    val x = UInt(log2Up(SCREEN_H).W)
     val y = UInt(log2Up(SCREEN_V).W)
+    val x = UInt(log2Up(SCREEN_H).W)
 }
 
 class VoxelVector3 extends Bundle {
@@ -18,7 +18,7 @@ class VoxelVector3 extends Bundle {
 
 /* 3x3 MVP Matrix with elements whose bitdepth is MVP_MAT_BITDEPTH */
 class Mat3x4 extends Bundle {
-    val mat = Vec(3, Vec(4, new FloatPoint()))
+    val mat = Vec(3, Vec(4, new Float32()))
 }
 
 import chisel3._

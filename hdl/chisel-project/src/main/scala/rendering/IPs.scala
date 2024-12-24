@@ -11,6 +11,12 @@ class FloatPoint extends Bundle {
     val sig  = UInt(10.W)
 }
 
+class Float32 extends Bundle {
+    val sign = Bool()
+    val int  = UInt(8.W)
+    val sig  = UInt(23.W)
+}
+
 object FloatPoint {
     def apply(sign: Bool, int: UInt, sig: UInt): FloatPoint = {
         val result = Wire(new FloatPoint())
