@@ -1,5 +1,6 @@
 #include "config.h"
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -10,7 +11,10 @@
 #include <stdexcept>
 #include <vector>
 
-ImageStack::ImageStack() : width(0), slices(0) { }
+ImageStack::ImageStack() : width(0), slices(0)
+{
+    // build opacity map
+}
 
 void ImageStack::add_image(const image_t& img)
 {
@@ -49,19 +53,6 @@ float ImageStack::y_abs_boundary() const
     return (static_cast<float>(slices) / width) * (SLICE_SIZE / PIXEL_SIZE);
 }
 
-// void ImageStack::prepare_gradients()
-// {
-//     gradients.resize(slices, width, width);
-//     for(uint32_t i = 0; i < slices; i++) {
-//         for(uint32_t j = 0; j < width; j++) {
-//             for(uint32_t k = 0; k < width; k++) {
-//                 Eigen::Vector4f grad = gradient(Eigen::Vector4f(j, k, i, 1));
-//                 gradients(i, j, k)   = grad;
-//             }
-//         }
-//     }
-// }
-
 Eigen::Vector4f ImageStack::gradient(Eigen::Vector4f& world_pos) const
 {
     Eigen::Vector3f voxel_pos = world2voxel(world_pos);
@@ -80,15 +71,15 @@ Eigen::Vector4f ImageStack::gradient(Eigen::Vector4f& world_pos) const
     float vx = voxel_pos[0];
     float vy = voxel_pos[1];
     float vz = voxel_pos[2];
+    // float vx = ceil(voxel_pos[0]);
+    // float vy = ceil(voxel_pos[1]);
+    // float vz = ceil(voxel_pos[2]);
 
     float vox_dx = (sample_voxel(vx + 1, vy, vz) - sample_voxel(vx - 1, vy, vz)) / 2.0f;
     float vox_dy = (sample_voxel(vx, vy + 1, vz) - sample_voxel(vx, vy - 1, vz)) / 2.0f;
     float vox_dz = (sample_voxel(vx, vy, vz + 1) - sample_voxel(vx, vy, vz - 1)) / 2.0f;
 
     vox_dx *= PIXEL_SIZE / SLICE_SIZE;
-    // float vox_dx = (images[vx + 1][vy][vz] - images[vx - 1][vy][vz]) / 2.0f;
-    // float vox_dy = (images[vx][vy + 1][vz] - images[vx][vy - 1][vz]) / 2.0f;
-    // float vox_dz = (images[vx][vy][vz + 1] - images[vx][vy][vz - 1]) / 2.0f;
 
     // change coordinate system to fit the world coordinate system
     return Eigen::Vector4f(vox_dz, -vox_dx, -vox_dy, 0);
@@ -209,8 +200,6 @@ float ImageStack::sample_opacity_world(Eigen::Vector4f& world_pos) const
                             + (levels[i + 1].opacity - levels[i].opacity)
                                   * (sample - levels[i].tissue)
                                   / (levels[i + 1].tissue - levels[i].tissue);
-                // printf("sample %f,%f,%f -> %f -> %f\n", world_pos[0], world_pos[1], world_pos[2],
-                //        sample, res);
                 return res;
             }
         }
@@ -229,11 +218,6 @@ float ImageStack::sample_opacity_world(Eigen::Vector4f& world_pos) const
     auto thres_normalize = [](float val, float thres) -> float {
         return val < thres ? val / thres : 1.0f;
     };
-
-    // if(gradient_magnitude != 0 && interpolation != 0) {
-    //     std::cout << "\ngradient magnitude: " << gradient_magnitude << std::endl;
-    //     std::cout << "interpolation: " << interpolation << std::endl;
-    // }
 
     return interpolation * thres_normalize(gradient_magnitude, 100.0f);
 }
@@ -271,4 +255,11 @@ Eigen::Vector3f ImageStack::world2voxel(Eigen::Vector4f& world_pos) const
     float vox_zmap = (world_pos[0] + 1) * (width) / 2;
 
     return Eigen::Vector3f(vox_xmap, vox_ymap, vox_zmap);
+}
+
+Eigen::Vector4f start_wrap(Eigen::Vector4f& cam_pos /* o */, Eigen::Vector4f& eye_ray /* d */)
+{
+    // wrap start point to which block opacity maximum value is above certain threshold
+    // return this wrapped point
+    return Eigen::Vector4f(0, 0, 0, 0);
 }

@@ -51,7 +51,7 @@ class MipVram extends Module {
     // Now the bram_port command will overlay commands from calc_res. This is a "force read" command.
     vram_channels.foreach { channel =>
         channel.io.read_channel.rden      := io.ram_port.ena
-        channel.io.read_channel.addr      := io.ram_port.addra >> 3.U / VRAM_CHANNELS.U
+        channel.io.read_channel.byte_addr := io.ram_port.addra >> 3.U
         channel.io.read_channel.ram_reset := io.ram_reset
     }
     io.ram_port.douta := vram_channels.map(_.io.read_channel.dout).reduce(Cat(_, _))
@@ -60,7 +60,7 @@ class MipVram extends Module {
 
 class RamPort extends Bundle {
     val rden           = Input(Bool())
-    val addr           = Input(UInt(VRAM_ADDRA_WIDTH.W))
+    val byte_addr      = Input(UInt(VRAM_ADDRA_WIDTH.W))
     val dout           = Output(UInt(DENS_DEPTH.W))
     val ram_reset      = Input(Bool())
     val ram_reset_busy = Output(Bool())
@@ -139,7 +139,7 @@ class MipVramChannel extends Module {
     stall := false.B
 
     val vram_rden = rd_cmd_reg.valid || io.read_channel.rden
-    uram_ctrl.io.rd_addr := Mux(io.read_channel.rden, io.read_channel.addr, rd_cmd_reg.rd_addr)
+    uram_ctrl.io.rd_byte_addr := Mux(io.read_channel.rden, io.read_channel.byte_addr, rd_cmd_reg.rd_addr)
 
     val read_cnt_reg = RegInit(0.U(32.W))
     val wr_cnt_reg   = RegInit(0.U(32.W))
@@ -165,9 +165,9 @@ class MipVramChannel extends Module {
         wr_max_reg := Mux(wr_max_reg > rd_cmd_delay.density, wr_max_reg, rd_cmd_delay.density)
     }
 
-    uram_ctrl.io.wr_addr := wbaddr
-    uram_ctrl.io.wren    := wben && rd_cmd_delay.valid
-    uram_ctrl.io.wrdata  := rd_cmd_delay.density
+    uram_ctrl.io.wr_byte_addr := wbaddr
+    uram_ctrl.io.wren         := wben && rd_cmd_delay.valid
+    uram_ctrl.io.wrdata       := rd_cmd_delay.density
 
     // read
     uram_ctrl.io.rden    := vram_rden || io.read_channel.rden
@@ -186,32 +186,36 @@ class Uram64Ctrl extends Module {
     val io = IO(new Bundle {
         val external_reset = Input(Bool())
 
-        val rd_addr = Input(UInt(VRAM_ADDRA_WIDTH.W))
-        val rden    = Input(Bool())
-        val rddata  = Output(UInt(8.W))
+        // val rd_addr = Input(UInt(VRAM_ADDRA_WIDTH.W))
+        val rd_byte_addr = Input(UInt(VRAM_BYTE_ADDR.W))
+        val rden         = Input(Bool())
+        val rddata       = Output(UInt(8.W))
 
-        val wr_addr = Input(UInt(VRAM_ADDRB_WIDTH.W))
-        val wren    = Input(Bool())
-        val wrdata  = Input(UInt(8.W))
+        // val wr_addr = Input(UInt(VRAM_ADDRB_WIDTH.W))
+        val wr_byte_addr = Input(UInt(VRAM_ADDRB_WIDTH.W))
+        val wren         = Input(Bool())
+        val wrdata       = Input(UInt(8.W))
     })
     val uram = Module(new ultra_vram())
 
     uram.io.clk := clock
     uram.io.rst := reset.asBool || io.external_reset
 
-    // read
-    uram.io.addra := io.rd_addr >> 3 // 64/8 = 8
+    // read @ port A
+    uram.io.addra := io.rd_byte_addr >> 3 // 64/8 = 8
     uram.io.ena   := io.rden
     // 3 clk latency
-    val byte_offset = RegNext(RegNext(RegNext(io.rd_addr(2, 0))))
+    val byte_offset = RegNext(RegNext(RegNext(io.rd_byte_addr(2, 0))))
     io.rddata := (uram.io.douta >> (byte_offset * 8.U))(7, 0)
 
-    // write
-    uram.io.addrb := io.wr_addr >> 3
+    // write @ port B
+    uram.io.addrb := io.wr_byte_addr >> 3
     uram.io.enb   := io.wren
-    uram.io.dinb  := io.wrdata
+    uram.io.dinb  := io.wrdata << (io.wr_byte_addr(2, 0) * 8.U)
+
+    val wr_byte_offset = io.wr_byte_addr(2, 0)
     uram.io.web := VecInit((0 until 8).map { i =>
-        val mask = (io.wr_addr(2, 0) === i.U)
+        val mask = (wr_byte_offset === i.U)
         mask && io.wren
     }).asUInt
 }

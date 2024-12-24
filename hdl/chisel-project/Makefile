@@ -2,7 +2,11 @@
 
 all:
 	sbt "runMain Main"
-	cp xilinx/wrapper/*.v build/
+	cp -r xilinx/wrapper/* build/
+
+run:
+	sbt run
+	cp -r xilinx/wrapper/*.v build/
 
 clean:
 	rm -rf build/

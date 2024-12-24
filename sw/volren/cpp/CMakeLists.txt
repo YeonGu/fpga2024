@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Add compiler flags
-add_compile_options(-Werror -Wall -O3 -mfma -mavx2 -flto -funroll-loops -fopt-info-vec -ffast-math)
+add_compile_options(-Werror -Wall -O2 -mfma -mavx2 -flto -funroll-loops -fopt-info-vec -ffast-math)
+# add_compile_options(-g)
 
 # Add all source files in the src directory
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)

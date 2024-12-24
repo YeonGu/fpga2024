@@ -1,12 +1,11 @@
 package mip.units
 
+import __global__.Params._
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import __global__.AXI4InterfaceM
-import __global__.Params._
 import mip.MipConfigs._
 import mip.xilinx._
-import _root_.circt.stage.ChiselStage
 
 class FetcherCtrl extends Bundle {
     val start_valid = Input(Bool())
@@ -19,6 +18,11 @@ class FetcherCtrl extends Bundle {
     val fetch_cnt      = Output(UInt(32.W))
     val cmd_send_state = Output(UInt(32.W))
     val stream_state   = Output(UInt(32.W))
+
+    val dispatchFifoWrens    = Output(UInt(32.W))
+    val dispatchFifoWracks   = Output(UInt(32.W))
+    val dispatchFifoRdens    = Output(UInt(32.W))
+    val dispatchFifoRdvalids = Output(UInt(32.W))
 }
 
 class MipDataFetcher extends Module {
@@ -36,12 +40,12 @@ class MipDataFetcher extends Module {
     // object FetcherState extends ChiselEnum {
     //     val IDLE, WORK = Value
     // }
-    object CmdSendState extends ChiselEnum {
-        val IDLE, SEND, FINISH = Value
-    }
-    object StreamReceiverState extends ChiselEnum {
-        val IDLE, RECV = Value
-    }
+    // object CmdSendState extends ChiselEnum {
+    //     val IDLE, SEND, FINISH = Value
+    // }
+    // object StreamReceiverState extends ChiselEnum {
+    //     val IDLE, RECV = Value
+    // }
 
     object DataFetchState extends ChiselEnum {
         val IDLE, CMD, STREAM, WAIT = Value
@@ -53,6 +57,8 @@ class MipDataFetcher extends Module {
 
     val dispatch_fifo = Module(new mip_dispatch_fifo)
 
+    // 512^3 takes 128MB
+    // from 0x8_7800_0000 to 0x8_7FFF_FFFF
     val TEXTURE_ADDR_BASE     = "h8_7800_0000"
     val stream_cmd_start_addr = RegInit(TEXTURE_ADDR_BASE.U(49.W))
 
@@ -67,12 +73,12 @@ class MipDataFetcher extends Module {
 
     switch(datafetch_state) {
         is(DataFetchState.IDLE) {
-            total_stream_recv_cnt := 0.U
-            cmd_send_cnt          := 0.U
             stream_cmd_start_addr := TEXTURE_ADDR_BASE.U
 
             when(io.ctrl.start_valid) {
-                datafetch_state := DataFetchState.CMD
+                total_stream_recv_cnt := 0.U
+                cmd_send_cnt          := 0.U
+                datafetch_state       := DataFetchState.CMD
             }
         }
         is(DataFetchState.CMD) {
@@ -109,43 +115,6 @@ class MipDataFetcher extends Module {
     io.ctrl.fetch_cnt    := total_stream_recv_cnt
     // io.ctrl.cmd_send_state := datafetch_state.asUInt
     io.ctrl.stream_state := datafetch_state.asUInt
-
-    // switch(cmd_sender_state) {
-    //     is(CmdSendState.IDLE) {
-    //         when(io.ctrl.start_valid && io.ctrl.start_ready) { // FIXME: check other components
-    //             cmd_sender_state := CmdSendState.SEND
-    //             cmd_send_cnt     := 0.U
-    //         }
-    //     }
-    //     is(CmdSendState.SEND) {
-    //         when(
-    //             (stream_cmd_start_addr === (VOXEL_COUNT.U - btt)) && io.m_axis_mm2s_cmd.tvalid && io.m_axis_mm2s_cmd.tready
-    //         ) {
-    //             cmd_sender_state := CmdSendState.FINISH
-    //             cmd_send_cnt     := cmd_send_cnt + 1.U
-    //         }
-    //     }
-    //     is(CmdSendState.FINISH) { cmd_sender_state := CmdSendState.IDLE }
-    // }
-    // switch(stream_recv_state) {
-    //     is(StreamReceiverState.IDLE) {
-    //         when(io.ctrl.start_valid && io.ctrl.start_ready) { stream_recv_state := StreamReceiverState.RECV }
-    //         stream_recv_cnt := 0.U
-    //     }
-    //     is(StreamReceiverState.RECV) {
-    //         when(
-    //             io.s_axis_mm2s.tvalid && io.s_axis_mm2s.tready && (stream_recv_cnt === (VOXEL_STREAM_CNT - 1).U)
-    //         ) {
-    //             stream_recv_state := StreamReceiverState.END
-    //         }
-
-    //         stream_recv_cnt := Mux(
-    //             io.s_axis_mm2s.tvalid && io.s_axis_mm2s.tready,
-    //             stream_recv_cnt + 1.U,
-    //             stream_recv_cnt
-    //         )
-    //     }
-    // }
 
     /* AXI Receiver Stream */
 
@@ -224,13 +193,23 @@ class MipDataFetcher extends Module {
     dispatch_fifo.io.wr_en := io.s_axis_mm2s.tvalid && io.s_axis_mm2s.tready
     dispatch_fifo.io.din   := io.s_axis_mm2s.tdata
 
+    val dispFifoWracks   = RegInit(0.U(32.W))
+    val dispFifoWrens    = RegInit(0.U(32.W))
+    val dispFifoRdens    = RegInit(0.U(32.W))
+    val dispFifoRdvalids = RegInit(0.U(32.W))
+
+    io.ctrl.dispatchFifoWracks   := dispFifoWracks
+    io.ctrl.dispatchFifoWrens    := dispFifoWrens
+    io.ctrl.dispatchFifoRdens    := dispFifoRdens
+    io.ctrl.dispatchFifoRdvalids := dispFifoRdvalids
+
     /** Data dispatch
       */
     val need_datas = io.mip_channels.map(_.need_data)
     val need       = need_datas.reduce(_ || _)
 
     object DispatchStates extends ChiselEnum {
-        val IDLE, WRITE_ADDR, DISPATCH, NEXT, END = Value
+        val IDLE, WRITE_ADDR, DISPATCH, DPT_DELAY, NEXT, END = Value
     }
     val dispatch_state   = RegInit(DispatchStates.IDLE)
     val dispatch_count   = RegInit(0.U(log2Ceil(WORKSET_WR_CNT).W))
@@ -245,8 +224,18 @@ class MipDataFetcher extends Module {
     io.ctrl.dispatch_cnt   := total_dispatched
     io.ctrl.cmd_send_state := datafetch_state.asUInt
 
+    // note that dispatch fifo has 2 cycle read latency.
+    // after dispatching, we need extra state DELAY #2 cycles to wait for dispatch completion.
+    val dispatch_delay     = 2.U
+    val dispatch_delay_cnt = RegInit(0.U(32.W))
+
     when(datafetch_state === DataFetchState.IDLE && io.ctrl.start_valid) {
-        dispatch_state := DispatchStates.IDLE
+        dispatch_state   := DispatchStates.IDLE
+        voxel_addr       := 0.U
+        dispFifoWracks   := 0.U
+        dispFifoWrens    := 0.U
+        dispFifoRdens    := 0.U
+        dispFifoRdvalids := 0.U
     }.otherwise {
         switch(dispatch_state) {
             is(DispatchStates.IDLE) {
@@ -261,15 +250,16 @@ class MipDataFetcher extends Module {
                 dispatch_state := DispatchStates.DISPATCH
             }
             is(DispatchStates.DISPATCH) {
-                when(dispatch_count === (WORKSET_WR_CNT - 1).U) { // FIXME: dispatch count -> 0
-                    dispatch_state := DispatchStates.IDLE
-                    // dispatch_state := Mux(
-                    //     total_dispatched === (n_dispatch_total - 1).U,
-                    //     DispatchStates.IDLE,
-                    //     DispatchStates.NEXT
-                    // )
-                    dispatch_state := DispatchStates.NEXT
+                when(dispatch_count === (WORKSET_WR_CNT - 1).U) {
+                    dispatch_state := DispatchStates.DPT_DELAY
                     voxel_addr     := voxel_addr + WORKSET_WR_CNT.U * (PROC_QUEUE_WR_WIDTH / 8).U
+                }
+                dispatch_delay_cnt := 0.U
+            }
+            is(DispatchStates.DPT_DELAY) {
+                dispatch_delay_cnt := dispatch_delay_cnt + 1.U
+                when(dispatch_delay_cnt === (dispatch_delay - 1.U)) {
+                    dispatch_state := DispatchStates.NEXT
                 }
             }
             is(DispatchStates.NEXT) {
@@ -278,7 +268,20 @@ class MipDataFetcher extends Module {
                     dispatch_channel := PriorityEncoder(need_datas)
                     total_dispatched := total_dispatched + 1.U
                 }
+                dispatch_delay_cnt := 0.U
             }
+        }
+        when(dispatch_fifo.io.wr_en) {
+            dispFifoWrens := dispFifoWrens + 1.U
+        }
+        when(dispatch_fifo.io.wr_ack) {
+            dispFifoWracks := dispFifoWracks + 1.U
+        }
+        when(dispatch_fifo.io.rd_en) {
+            dispFifoRdens := dispFifoRdens + 1.U
+        }
+        when(dispatch_fifo.io.valid) {
+            dispFifoRdvalids := dispFifoRdvalids + 1.U
         }
     }
 
@@ -299,7 +302,6 @@ class MipDataFetcher extends Module {
     // proc queue
     io.mip_channels.zipWithIndex.foreach { case (c, i) =>
         c.proc_queue_wren := dispatch_fifo.io.valid && (dispatch_channel === i.U)
-    // c.proc_queue_wren := RegNext( (dispatch_state === DispatchStates.DISPATCH) && (dispatch_channel === i.U))
     }
     io.mip_channels.foreach(_.proc_queue_wrdata := dispatch_fifo.io.dout)
 }
@@ -308,6 +310,6 @@ object Dfter extends App {
     ChiselStage.emitSystemVerilogFile(
         new MipDataFetcher(),
         firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info"),
-        args = Array("--target-dir", "build")
+        args = Array("--target-dir", "build/mods")
     )
 }
